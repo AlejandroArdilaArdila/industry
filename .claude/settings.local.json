@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(php -l app/Models/Usuario.php)",
+      "Bash(php -l app/Services/Usuarios/UsuariosService.php)",
+      "Bash(php -l app/Services/Auth/AuthService.php)",
+      "Bash(php -r ' *)",
+      "Bash(php -l app/Models/ProductoPrecio.php)"
+    ]
+  }
+}

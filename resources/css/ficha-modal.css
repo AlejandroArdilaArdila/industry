@@ -1,0 +1,364 @@
+/* Combos Syncfusion dentro del panel de ficha: mismo aspecto que los inputs Tailwind del panel. */
+.ficha-combo.e-input-group,
+.ficha-combo.e-input-group.e-control-wrapper {
+    height: 2.5rem;
+    margin: 0;
+    padding: 0 0.25rem 0 0.5rem;
+    border: 1px solid var(--input) !important;
+    border-radius: calc(var(--radius) - 2px) !important;
+    background: var(--background) !important;
+    box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+    transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.ficha-combo.e-input-group::before,
+.ficha-combo.e-input-group::after {
+    display: none !important;
+}
+
+.ficha-combo.e-input-group.e-input-focus {
+    border-color: var(--primary) !important;
+    box-shadow: 0 0 0 3px color-mix(in oklab, var(--primary) 15%, transparent);
+}
+
+.ficha-combo.e-input-group .e-input {
+    height: 100% !important;
+    min-height: 0 !important;
+    padding: 0 0.25rem !important;
+    font-size: 0.875rem !important;
+    color: var(--foreground) !important;
+    background: transparent !important;
+}
+
+.ficha-combo.e-input-group.e-disabled {
+    opacity: 0.6;
+}
+
+.ficha-combo.e-popup {
+    border-radius: calc(var(--radius) - 2px);
+    overflow: hidden;
+}
+
+
+/* ====================================================================
+ * Panel lateral (canvas) de ficha: desliza desde la derecha o la izquierda.
+ * ==================================================================== */
+.ficha-overlay {
+    --dir: 1;
+    --curva: cubic-bezier(0.22, 1, 0.36, 1);
+    position: fixed;
+    inset: 0;
+    z-index: 900;
+    display: flex;
+    justify-content: flex-end;
+    padding: 0;
+    background:
+        radial-gradient(60rem 40rem at calc(50% + var(--dir) * 50%) 30%, color-mix(in oklab, var(--primary) 28%, transparent), transparent 70%),
+        rgb(0 0 0 / 0.5);
+    opacity: 0;
+    backdrop-filter: blur(0);
+    transition: opacity 0.35s ease, backdrop-filter 0.45s ease;
+}
+.ficha-overlay[data-lado='izquierda'] {
+    --dir: -1;
+    justify-content: flex-start;
+}
+.ficha-overlay.is-open {
+    opacity: 1;
+    backdrop-filter: blur(6px) saturate(1.1);
+}
+
+.ficha-dialog {
+    position: relative;
+    isolation: isolate;
+    width: 100%;
+    height: 100dvh;
+    max-width: 100vw;
+    border-radius: 0;
+    box-shadow: 0 0 0 1px rgb(255 255 255 / 0.04), 0 30px 80px -10px rgb(0 0 0 / 0.55);
+    transform: translateX(calc(var(--dir) * 108%)) scale(0.97);
+    opacity: 0.6;
+    transition:
+        transform 0.55s var(--curva),
+        opacity 0.35s ease,
+        width 0.5s var(--curva);
+    will-change: transform;
+}
+.ficha-dialog.is-open {
+    transform: none;
+    opacity: 1;
+}
+
+/* El panel usa toda la ventana salvo una franja vertical libre en el lado opuesto. */
+@media (min-width: 640px) {
+    .ficha-dialog {
+        --franja: 4.5rem;
+        width: calc(100% - var(--franja));
+        border-width: 0;
+        border-radius: 0;
+    }
+    .ficha-dialog[data-ancho='mitad'] {
+        width: min(calc(100% - var(--franja)), max(42rem, 50vw));
+    }
+    .ficha-dialog[data-ancho='compacto'] {
+        width: min(calc(100% - var(--franja)), 66rem);
+    }
+}
+
+/* Borde luminoso animado alrededor del panel */
+.ficha-dialog::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: 50;
+    pointer-events: none;
+    border-radius: inherit;
+    padding: 1.5px;
+    background: linear-gradient(
+        calc(180deg + var(--dir) * 90deg),
+        color-mix(in oklab, var(--primary) 90%, white),
+        transparent 35%,
+        transparent 65%,
+        color-mix(in oklab, var(--primary) 70%, transparent)
+    );
+    background-size: 100% 300%;
+    animation: ficha-borde 6s ease-in-out infinite alternate;
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+    opacity: 0.75;
+}
+@keyframes ficha-borde {
+    to { background-position: 0 100%; }
+}
+
+/* Barra de progreso de pasos */
+.ficha-progreso {
+    position: absolute;
+    inset: 0 0 auto 0;
+    z-index: 60;
+    height: 3px;
+    background: color-mix(in oklab, var(--primary) 12%, transparent);
+}
+.ficha-progreso > span {
+    display: block;
+    height: 100%;
+    width: 0;
+    border-radius: 0 3px 3px 0;
+    background: linear-gradient(90deg, var(--primary), color-mix(in oklab, var(--primary) 55%, #22d3ee));
+    box-shadow: 0 0 12px color-mix(in oklab, var(--primary) 70%, transparent);
+    transition: width 0.6s var(--curva);
+}
+
+/* Cabecera con aurora animada */
+.ficha-dialog [data-ficha] > header {
+    background-image: none;
+}
+.ficha-dialog [data-ficha] > header::before {
+    content: '';
+    position: absolute;
+    inset: -40% -10%;
+    pointer-events: none;
+    background:
+        radial-gradient(28rem 14rem at 15% 30%, color-mix(in oklab, var(--primary) 32%, transparent), transparent 70%),
+        radial-gradient(24rem 12rem at 85% 70%, color-mix(in oklab, var(--primary) 22%, #22d3ee 18%), transparent 70%);
+    filter: blur(24px);
+    animation: ficha-aurora 12s ease-in-out infinite alternate;
+}
+.ficha-dialog [data-ficha] > header > div:not(.ficha-controles) {
+    position: relative;
+    padding-right: 6.5rem;
+}
+@keyframes ficha-aurora {
+    from { transform: translate3d(-4%, -3%, 0) scale(1); }
+    to { transform: translate3d(5%, 4%, 0) scale(1.15); }
+}
+
+/* Botones de la cabecera: mover de lado / ampliar */
+.ficha-controles {
+    position: absolute;
+    top: 1rem;
+    right: 3.5rem;
+    z-index: 2;
+    display: flex;
+    gap: 0.25rem;
+}
+.ficha-controles button {
+    display: none;
+    height: 2.25rem;
+    width: 2.25rem;
+    align-items: center;
+    justify-content: center;
+    border-radius: 9999px;
+    font-size: 0.8rem;
+    color: var(--muted-foreground);
+    transition: background-color 0.2s, color 0.2s, transform 0.3s var(--curva);
+}
+@media (min-width: 640px) {
+    .ficha-controles button {
+        display: inline-flex;
+    }
+}
+.ficha-controles button:hover {
+    background: var(--muted);
+    color: var(--foreground);
+}
+/* La X no se mueve, gira ni crece al pasar el mouse: así es fácil de acertar. */
+.ficha-dialog [data-ficha] > header [data-ficha-close],
+.ficha-dialog [data-ficha] > header [data-ficha-close] i {
+    transform: none !important;
+    transition: background-color 0.15s, color 0.15s;
+}
+.ficha-dialog [data-ficha] > header [data-ficha-close] {
+    z-index: 3;
+    cursor: pointer;
+}
+
+/* Entrada escalonada: cabecera, pasos y campos */
+.ficha-dialog.is-open [data-ficha] > header {
+    animation: ficha-baja 0.6s var(--curva) 0.15s both;
+}
+.ficha-dialog.is-open nav li {
+    animation: ficha-lado 0.55s var(--curva) both;
+}
+.ficha-dialog.is-open nav li:nth-child(1) { animation-delay: 0.20s; }
+.ficha-dialog.is-open nav li:nth-child(2) { animation-delay: 0.26s; }
+.ficha-dialog.is-open nav li:nth-child(3) { animation-delay: 0.32s; }
+.ficha-dialog.is-open nav li:nth-child(4) { animation-delay: 0.38s; }
+.ficha-dialog.is-open nav li:nth-child(5) { animation-delay: 0.44s; }
+.ficha-dialog.is-open nav li:nth-child(6) { animation-delay: 0.50s; }
+.ficha-dialog.is-open nav li:nth-child(n + 7) { animation-delay: 0.56s; }
+
+.ficha-dialog form[data-step].flex > * {
+    animation: ficha-sube 0.5s var(--curva) both;
+}
+.ficha-dialog form[data-step].flex > :nth-child(1) { animation-delay: 0.02s; }
+.ficha-dialog form[data-step].flex > :nth-child(2) { animation-delay: 0.07s; }
+.ficha-dialog form[data-step].flex > :nth-child(3) { animation-delay: 0.12s; }
+.ficha-dialog form[data-step].flex > :nth-child(4) { animation-delay: 0.17s; }
+.ficha-dialog form[data-step].flex > :nth-child(5) { animation-delay: 0.22s; }
+.ficha-dialog form[data-step].flex > :nth-child(n + 6) { animation-delay: 0.27s; }
+
+@keyframes ficha-baja {
+    from { opacity: 0; transform: translateY(-14px); }
+}
+@keyframes ficha-lado {
+    from { opacity: 0; transform: translateX(calc(var(--dir) * 28px)); }
+}
+@keyframes ficha-sube {
+    from { opacity: 0; transform: translateY(14px); }
+}
+
+/* Paso activo: barra de acento que se desliza */
+.ficha-dialog nav [data-step-target] {
+    position: relative;
+}
+.ficha-dialog nav [data-step-target]::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 22%;
+    bottom: 22%;
+    width: 3px;
+    border-radius: 3px;
+    background: var(--primary);
+    transform: scaleY(0);
+    transition: transform 0.35s var(--curva);
+}
+.ficha-dialog nav [data-step-target][data-active]::before {
+    transform: scaleY(1);
+}
+.ficha-dialog nav [data-step-target]:not(:disabled):hover [data-step-badge] {
+    transform: scale(1.1) rotate(-6deg);
+}
+.ficha-dialog nav [data-step-badge] {
+    transition: transform 0.3s var(--curva), background-color 0.2s, border-color 0.2s, color 0.2s;
+}
+
+/* Pasos con color propio (--pc): icono teñido, paso activo relleno y con su barra lateral. */
+.ficha-dialog nav [data-step-target].paso-color::before { background: var(--pc); }
+.ficha-dialog nav [data-step-target].paso-color [data-step-badge] {
+    color: var(--pc);
+    background: color-mix(in oklab, var(--pc) 12%, var(--background));
+    border-color: color-mix(in oklab, var(--pc) 35%, transparent);
+}
+.ficha-dialog nav [data-step-target].paso-color[data-active] { background: color-mix(in oklab, var(--pc) 10%, var(--background)); }
+.ficha-dialog nav [data-step-target].paso-color[data-active] [data-step-badge] {
+    color: #fff;
+    background: var(--pc);
+    border-color: var(--pc);
+    box-shadow: 0 6px 14px -6px var(--pc);
+}
+.ficha-dialog nav [data-step-target].paso-color[data-active] [data-step-title] { color: var(--pc); font-weight: 700; }
+
+/* Esqueleto de carga con destello */
+.ficha-dialog .animate-pulse {
+    animation: none;
+    background-image: linear-gradient(100deg, transparent 30%, color-mix(in oklab, var(--primary) 18%, transparent) 50%, transparent 70%);
+    background-size: 220% 100%;
+    animation: ficha-destello 1.4s linear infinite;
+}
+@keyframes ficha-destello {
+    from { background-position: 120% 0; }
+    to { background-position: -120% 0; }
+}
+
+/* Botón principal con brillo al pasar el cursor */
+.ficha-dialog [data-step-save] {
+    position: relative;
+    overflow: hidden;
+}
+.ficha-dialog [data-step-save]::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(110deg, transparent 30%, rgb(255 255 255 / 0.35) 50%, transparent 70%);
+    transform: translateX(-120%);
+}
+.ficha-dialog [data-step-save]:not(:disabled):hover::after {
+    transform: translateX(120%);
+    transition: transform 0.7s ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .ficha-overlay,
+    .ficha-dialog,
+    .ficha-dialog * ,
+    .ficha-dialog::after {
+        animation: none !important;
+        transition-duration: 0.01ms !important;
+    }
+}
+
+/*
+ * En modo oscuro el modal de ficha usa un "carbón teñido": superficies oscuras
+ * con el matiz (h) del primario del tema y croma bajo, en escalones de
+ * luminosidad fija. Así cada tema da un modal con su color (azul noche, verde
+ * bosque, vino...) sin quedar gris ni saturado. En neutral el croma es 0 y
+ * queda gris, como corresponde. min(c, …) limita la saturación de temas vivos.
+ *
+ * Tailwind resuelve --color-* en :root, así que también se re-apuntan aquí.
+ */
+@supports (color: oklch(from red l c h)) {
+    .dark .ficha-dialog {
+        --background: oklch(from var(--primary) 0.235 min(c, 0.035) h);
+        --card: oklch(from var(--primary) 0.27 min(c, 0.04) h);
+        --popover: oklch(from var(--primary) 0.30 min(c, 0.04) h);
+        --muted: oklch(from var(--primary) 0.33 min(c, 0.045) h);
+        --secondary: oklch(from var(--primary) 0.33 min(c, 0.045) h);
+        --accent: oklch(from var(--primary) 0.35 min(c, 0.05) h);
+        --border: oklch(from var(--primary) 0.40 min(c, 0.05) h);
+        --input: oklch(from var(--primary) 0.40 min(c, 0.05) h);
+        --muted-foreground: oklch(from var(--primary) 0.78 min(c, 0.03) h);
+
+        --color-background: var(--background);
+        --color-card: var(--card);
+        --color-popover: var(--popover);
+        --color-muted: var(--muted);
+        --color-secondary: var(--secondary);
+        --color-accent: var(--accent);
+        --color-border: var(--border);
+        --color-input: var(--input);
+        --color-muted-foreground: var(--muted-foreground);
+    }
+}

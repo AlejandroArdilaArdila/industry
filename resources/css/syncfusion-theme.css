@@ -1,0 +1,10 @@
+/* Tema Material 3 de Syncfusion EJ2, solo para páginas con grids. */
+@import '@syncfusion/ej2-base/styles/material3.css';
+@import '@syncfusion/ej2-buttons/styles/material3.css';
+@import '@syncfusion/ej2-inputs/styles/material3.css';
+@import '@syncfusion/ej2-navigations/styles/material3.css';
+@import '@syncfusion/ej2-popups/styles/material3.css';
+@import '@syncfusion/ej2-calendars/styles/material3.css';
+@import '@syncfusion/ej2-dropdowns/styles/material3.css';
+@import '@syncfusion/ej2-grids/styles/material3.css';
+@import './syncfusion-theme-accents.css';

@@ -1,0 +1,54 @@
+/* Franja de tarjetas estadísticas sobre los listados (misma familia visual del dashboard). */
+.st { --curva: cubic-bezier(0.22, 1, 0.36, 1); border-bottom: 1px solid var(--border); background: color-mix(in oklab, var(--primary) 3%, var(--background)); }
+.st-bar { display: flex; align-items: center; gap: 10px; padding: 8px 16px 0; font-size: 12px; color: var(--muted-foreground); }
+.st-bar b { color: var(--foreground); font-size: 12.5px; letter-spacing: 0.01em; }
+.st-filtro { display: none; align-items: center; gap: 6px; padding: 2px 4px 2px 10px; border-radius: 999px; background: color-mix(in oklab, var(--primary) 14%, transparent); color: var(--primary); font-weight: 700; font-size: 11px; }
+.st-filtro.on { display: inline-flex; }
+.st-filtro button { width: 18px; height: 18px; border: 0; border-radius: 50%; background: var(--primary); color: var(--primary-foreground); font-size: 9px; cursor: pointer; }
+.st-toggle { margin-left: auto; width: 26px; height: 26px; display: grid; place-items: center; border: 0; border-radius: 8px; background: none; color: var(--muted-foreground); cursor: pointer; transition: background-color 0.2s, transform 0.4s var(--curva); }
+.st-toggle:hover { background: var(--muted); color: var(--foreground); }
+.st.cerrado .st-toggle { transform: rotate(180deg); }
+.st-cuerpo { display: grid; grid-template-rows: 1fr; transition: grid-template-rows 0.45s var(--curva); }
+.st.cerrado .st-cuerpo { grid-template-rows: 0fr; }
+.st-cuerpo > div { overflow: hidden; min-height: 0; }
+.st-fila { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(176px, 1fr); gap: 10px; padding: 8px 16px 12px; overflow-x: auto; scrollbar-width: thin; }
+
+.st-card { --c: var(--primary); position: relative; display: flex; flex-direction: column; gap: 2px; min-width: 0; padding: 10px 12px 9px; text-align: left; border: 1px solid var(--border); border-radius: 14px; background: var(--card); color: inherit; overflow: hidden;
+    opacity: 0; transform: translateY(10px); animation: st-entra 0.55s var(--curva) forwards; animation-delay: calc(var(--i, 0) * 45ms); transition: transform 0.3s var(--curva), box-shadow 0.3s, border-color 0.2s; }
+@keyframes st-entra { to { opacity: 1; transform: none; } }
+.st-card::before { content: ''; position: absolute; inset: 0 0 auto 0; height: 3px; background: linear-gradient(90deg, var(--c), transparent); }
+.st-card::after { content: ''; position: absolute; right: -22px; top: -22px; width: 84px; height: 84px; border-radius: 50%; background: var(--c); opacity: 0.08; transition: transform 0.5s var(--curva); }
+button.st-card { cursor: pointer; }
+button.st-card:hover { transform: translateY(-3px); box-shadow: 0 14px 26px -16px var(--c); border-color: color-mix(in oklab, var(--c) 55%, var(--border)); }
+button.st-card:hover::after { transform: scale(1.5); }
+.st-card.on { border-color: var(--c); box-shadow: 0 0 0 2px color-mix(in oklab, var(--c) 30%, transparent), 0 14px 26px -16px var(--c); }
+.st-top { display: flex; align-items: center; gap: 8px; }
+.st-ico { width: 26px; height: 26px; display: grid; place-items: center; flex: 0 0 auto; border-radius: 9px; background: var(--c); color: #fff; font-size: 11px; box-shadow: 0 6px 12px -6px var(--c); }
+.st-lbl { font-size: 10px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted-foreground); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.st-val { font-size: 1.55rem; font-weight: 800; letter-spacing: -0.03em; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.st-sub { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; min-height: 18px; font-size: 10.5px; color: var(--muted-foreground); }
+.st-chip { display: inline-flex; align-items: center; gap: 3px; padding: 0 7px; border-radius: 999px; font-size: 10px; font-weight: 700; line-height: 1.7; background: color-mix(in oklab, var(--muted-foreground) 14%, transparent); color: var(--muted-foreground); }
+.st-chip.up { background: rgb(16 185 129 / 0.15); color: #059669; } .st-chip.down { background: rgb(239 68 68 / 0.15); color: #dc2626; }
+.dark .st-chip.up { color: #34d399; } .dark .st-chip.down { color: #f87171; }
+.st-spark { display: block; width: 100%; height: 22px; margin-top: 2px; overflow: visible; }
+.st-spark .l { fill: none; stroke: var(--c); stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 400; stroke-dashoffset: 400; animation: st-trazo 1.3s 0.2s ease forwards; }
+.st-spark .a { fill: var(--c); opacity: 0.12; }
+@keyframes st-trazo { to { stroke-dashoffset: 0; } }
+
+/* Anillo de completitud */
+.st-anillo { display: flex; align-items: center; gap: 10px; }
+.st-anillo svg { width: 46px; height: 46px; flex: 0 0 auto; transform: rotate(-90deg); }
+.st-anillo circle { fill: none; stroke-width: 5; stroke-linecap: round; }
+.st-anillo .bg { stroke: color-mix(in oklab, var(--muted-foreground) 18%, transparent); }
+.st-anillo .fg { stroke: var(--c); stroke-dasharray: 100; stroke-dashoffset: 100; transition: stroke-dashoffset 1.2s var(--curva); }
+
+/* Ranking de ciudades (tarjeta ancha) */
+.st-ancha { grid-column: span 2; }
+.st-rank { display: flex; flex-direction: column; gap: 5px; margin-top: 4px; }
+.st-rk { display: grid; grid-template-columns: minmax(0, 88px) minmax(0, 1fr) auto; gap: 8px; align-items: center; font-size: 11px; }
+.st-rk span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 600; }
+.st-rk .bar { height: 6px; border-radius: 6px; background: color-mix(in oklab, var(--muted-foreground) 14%, transparent); overflow: hidden; }
+.st-rk .bar i { display: block; width: 0; height: 100%; border-radius: 6px; background: linear-gradient(90deg, var(--c), color-mix(in oklab, var(--c) 55%, #22d3ee)); transition: width 1s var(--curva); }
+.st-rk b { font-variant-numeric: tabular-nums; }
+
+@media (prefers-reduced-motion: reduce) { .st *, .st *::before, .st *::after { animation-duration: 0.01ms !important; animation-delay: 0s !important; transition-duration: 0.01ms !important; } .st-card { opacity: 1; transform: none; } }

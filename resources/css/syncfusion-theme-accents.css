@@ -1,0 +1,389 @@
+/*
+ * Aproxima el color primario (--color-sf-primary y derivados) de Syncfusion
+ * Material3 al acento del tema Cleopatra seleccionado (ver cleopatra-theme.css
+ * y resources/js/panel/layout.js, que ponen data-theme/.e-dark-mode en <html>).
+ *
+ * Los valores de Syncfusion son tripletes "R, G, B" (sin rgb()/rgba()), usados
+ * como var(--color-sf-primary) dentro de rgba(). No hay build oficial de
+ * Syncfusion para estos 10 colores: esto es una aproximación visual, no un
+ * theme "Theme Studio" oficial, así que el contraste no está garantizado al
+ * mismo nivel que los themes nativos de Syncfusion.
+ */
+
+html[data-theme="neutral"] {
+    --color-sf-primary: 17, 24, 39;         /* gray-900 */
+    --color-sf-on-primary: 255, 255, 255;
+    --color-sf-primary-container: 243, 244, 246; /* gray-100 */
+    --color-sf-on-primary-container: 17, 24, 39;
+    --color-sf-surface-tint-color: 17, 24, 39;
+    --color-sf-inverse-primary: 229, 231, 235; /* gray-200 */
+    --grid-light-primary: 17, 24, 39;
+    --grid-light-on-primary: 255, 255, 255;
+    --grid-light-primary-container: 243, 244, 246;
+    --grid-light-on-primary-container: 17, 24, 39;
+}
+
+html[data-theme="neutral"].e-dark-mode {
+    --color-sf-primary: 229, 231, 235;      /* gray-200 */
+    --color-sf-on-primary: 17, 24, 39;
+    --color-sf-primary-container: 31, 41, 55; /* gray-800 */
+    --color-sf-on-primary-container: 243, 244, 246;
+    --color-sf-surface-tint-color: 229, 231, 235;
+    --color-sf-inverse-primary: 17, 24, 39;
+}
+
+html[data-theme="blue"] {
+    --color-sf-primary: 37, 99, 235;        /* blue-600 */
+    --color-sf-on-primary: 255, 255, 255;
+    --color-sf-primary-container: 219, 234, 254; /* blue-100 */
+    --color-sf-on-primary-container: 30, 58, 138;
+    --color-sf-surface-tint-color: 37, 99, 235;
+    --color-sf-inverse-primary: 96, 165, 250;
+    --grid-light-primary: 37, 99, 235;
+    --grid-light-on-primary: 255, 255, 255;
+    --grid-light-primary-container: 219, 234, 254;
+    --grid-light-on-primary-container: 30, 58, 138;
+}
+
+html[data-theme="blue"].e-dark-mode {
+    --color-sf-primary: 96, 165, 250;       /* blue-400 */
+    --color-sf-on-primary: 30, 58, 138;
+    --color-sf-primary-container: 30, 58, 138; /* blue-900 */
+    --color-sf-on-primary-container: 219, 234, 254;
+    --color-sf-surface-tint-color: 96, 165, 250;
+    --color-sf-inverse-primary: 59, 130, 246;
+}
+
+html[data-theme="green"] {
+    --color-sf-primary: 5, 150, 105;        /* emerald-600 */
+    --color-sf-on-primary: 255, 255, 255;
+    --color-sf-primary-container: 209, 250, 229; /* emerald-100 */
+    --color-sf-on-primary-container: 6, 78, 59;
+    --color-sf-surface-tint-color: 5, 150, 105;
+    --color-sf-inverse-primary: 52, 211, 153;
+    --grid-light-primary: 5, 150, 105;
+    --grid-light-on-primary: 255, 255, 255;
+    --grid-light-primary-container: 209, 250, 229;
+    --grid-light-on-primary-container: 6, 78, 59;
+}
+
+html[data-theme="green"].e-dark-mode {
+    --color-sf-primary: 52, 211, 153;       /* emerald-400 */
+    --color-sf-on-primary: 6, 78, 59;
+    --color-sf-primary-container: 6, 78, 59; /* emerald-900 */
+    --color-sf-on-primary-container: 209, 250, 229;
+    --color-sf-surface-tint-color: 52, 211, 153;
+    --color-sf-inverse-primary: 16, 185, 129;
+}
+
+html[data-theme="orange"] {
+    --color-sf-primary: 249, 115, 22;       /* orange-500 */
+    --color-sf-on-primary: 255, 255, 255;
+    --color-sf-primary-container: 255, 237, 213; /* orange-100 */
+    --color-sf-on-primary-container: 124, 45, 18;
+    --color-sf-surface-tint-color: 249, 115, 22;
+    --color-sf-inverse-primary: 251, 146, 60;
+    --grid-light-primary: 249, 115, 22;
+    --grid-light-on-primary: 255, 255, 255;
+    --grid-light-primary-container: 255, 237, 213;
+    --grid-light-on-primary-container: 124, 45, 18;
+}
+
+html[data-theme="orange"].e-dark-mode {
+    --color-sf-primary: 251, 146, 60;       /* orange-400 */
+    --color-sf-on-primary: 124, 45, 18;
+    --color-sf-primary-container: 124, 45, 18; /* orange-900 */
+    --color-sf-on-primary-container: 255, 237, 213;
+    --color-sf-surface-tint-color: 251, 146, 60;
+    --color-sf-inverse-primary: 249, 115, 22;
+}
+
+html[data-theme="yellow"] {
+    --color-sf-primary: 250, 204, 21;       /* yellow-400 */
+    --color-sf-on-primary: 17, 24, 39;
+    --color-sf-primary-container: 254, 249, 195; /* yellow-100 */
+    --color-sf-on-primary-container: 113, 63, 18;
+    --color-sf-surface-tint-color: 250, 204, 21;
+    --color-sf-inverse-primary: 234, 179, 8;
+    --grid-light-primary: 250, 204, 21;
+    --grid-light-on-primary: 17, 24, 39;
+    --grid-light-primary-container: 254, 249, 195;
+    --grid-light-on-primary-container: 113, 63, 18;
+}
+
+html[data-theme="yellow"].e-dark-mode {
+    --color-sf-primary: 250, 204, 21;       /* yellow-400 (ya es claro) */
+    --color-sf-on-primary: 17, 24, 39;
+    --color-sf-primary-container: 113, 63, 18; /* yellow-900 */
+    --color-sf-on-primary-container: 254, 249, 195;
+    --color-sf-surface-tint-color: 250, 204, 21;
+    --color-sf-inverse-primary: 234, 179, 8;
+}
+
+html[data-theme="stone"] {
+    --color-sf-primary: 87, 83, 78;         /* stone-600 */
+    --color-sf-on-primary: 255, 255, 255;
+    --color-sf-primary-container: 245, 245, 244; /* stone-100 */
+    --color-sf-on-primary-container: 28, 25, 23;
+    --color-sf-surface-tint-color: 87, 83, 78;
+    --color-sf-inverse-primary: 168, 162, 158;
+    --grid-light-primary: 87, 83, 78;
+    --grid-light-on-primary: 255, 255, 255;
+    --grid-light-primary-container: 245, 245, 244;
+    --grid-light-on-primary-container: 28, 25, 23;
+}
+
+html[data-theme="stone"].e-dark-mode {
+    --color-sf-primary: 168, 162, 158;      /* stone-400 */
+    --color-sf-on-primary: 28, 25, 23;
+    --color-sf-primary-container: 28, 25, 23; /* stone-900 */
+    --color-sf-on-primary-container: 245, 245, 244;
+    --color-sf-surface-tint-color: 168, 162, 158;
+    --color-sf-inverse-primary: 120, 113, 108;
+}
+
+html[data-theme="slate"] {
+    --color-sf-primary: 71, 85, 105;        /* slate-600 */
+    --color-sf-on-primary: 255, 255, 255;
+    --color-sf-primary-container: 241, 245, 249; /* slate-100 */
+    --color-sf-on-primary-container: 15, 23, 42;
+    --color-sf-surface-tint-color: 71, 85, 105;
+    --color-sf-inverse-primary: 148, 163, 184;
+    --grid-light-primary: 71, 85, 105;
+    --grid-light-on-primary: 255, 255, 255;
+    --grid-light-primary-container: 241, 245, 249;
+    --grid-light-on-primary-container: 15, 23, 42;
+}
+
+html[data-theme="slate"].e-dark-mode {
+    --color-sf-primary: 148, 163, 184;      /* slate-400 */
+    --color-sf-on-primary: 15, 23, 42;
+    --color-sf-primary-container: 15, 23, 42; /* slate-900 */
+    --color-sf-on-primary-container: 241, 245, 249;
+    --color-sf-surface-tint-color: 148, 163, 184;
+    --color-sf-inverse-primary: 100, 116, 139;
+}
+
+html[data-theme="sky"] {
+    --color-sf-primary: 2, 132, 199;        /* sky-600 */
+    --color-sf-on-primary: 255, 255, 255;
+    --color-sf-primary-container: 224, 242, 254; /* sky-100 */
+    --color-sf-on-primary-container: 12, 74, 110;
+    --color-sf-surface-tint-color: 2, 132, 199;
+    --color-sf-inverse-primary: 56, 189, 248;
+    --grid-light-primary: 2, 132, 199;
+    --grid-light-on-primary: 255, 255, 255;
+    --grid-light-primary-container: 224, 242, 254;
+    --grid-light-on-primary-container: 12, 74, 110;
+}
+
+html[data-theme="sky"].e-dark-mode {
+    --color-sf-primary: 56, 189, 248;       /* sky-400 */
+    --color-sf-on-primary: 12, 74, 110;
+    --color-sf-primary-container: 12, 74, 110; /* sky-900 */
+    --color-sf-on-primary-container: 224, 242, 254;
+    --color-sf-surface-tint-color: 56, 189, 248;
+    --color-sf-inverse-primary: 14, 165, 233;
+}
+
+html[data-theme="azure"] {
+    --color-sf-primary: 79, 70, 229;        /* indigo-600 */
+    --color-sf-on-primary: 255, 255, 255;
+    --color-sf-primary-container: 224, 231, 255; /* indigo-100 */
+    --color-sf-on-primary-container: 49, 46, 129;
+    --color-sf-surface-tint-color: 79, 70, 229;
+    --color-sf-inverse-primary: 129, 140, 248;
+    --grid-light-primary: 79, 70, 229;
+    --grid-light-on-primary: 255, 255, 255;
+    --grid-light-primary-container: 224, 231, 255;
+    --grid-light-on-primary-container: 49, 46, 129;
+}
+
+html[data-theme="azure"].e-dark-mode {
+    --color-sf-primary: 129, 140, 248;      /* indigo-400 */
+    --color-sf-on-primary: 49, 46, 129;
+    --color-sf-primary-container: 49, 46, 129; /* indigo-900 */
+    --color-sf-on-primary-container: 224, 231, 255;
+    --color-sf-surface-tint-color: 129, 140, 248;
+    --color-sf-inverse-primary: 99, 102, 241;
+}
+
+html[data-theme="rose"] {
+    --color-sf-primary: 225, 29, 72;        /* rose-600 */
+    --color-sf-on-primary: 255, 255, 255;
+    --color-sf-primary-container: 255, 228, 230; /* rose-100 */
+    --color-sf-on-primary-container: 136, 19, 55;
+    --color-sf-surface-tint-color: 225, 29, 72;
+    --color-sf-inverse-primary: 251, 113, 133;
+    --grid-light-primary: 225, 29, 72;
+    --grid-light-on-primary: 255, 255, 255;
+    --grid-light-primary-container: 255, 228, 230;
+    --grid-light-on-primary-container: 136, 19, 55;
+}
+
+html[data-theme="rose"].e-dark-mode {
+    --color-sf-primary: 251, 113, 133;      /* rose-400 */
+    --color-sf-on-primary: 136, 19, 55;
+    --color-sf-primary-container: 136, 19, 55; /* rose-900 */
+    --color-sf-on-primary-container: 255, 228, 230;
+    --color-sf-surface-tint-color: 251, 113, 133;
+    --color-sf-inverse-primary: 244, 63, 94;
+}
+
+/*
+ * Esquema de color de las grids (cabecera, cebra, hover, selección y pie)
+ * derivado del primario activo, mezclado sobre la superficie de Syncfusion para
+ * que funcione igual en claro y oscuro. Se usa !important porque los selectores
+ * de hover/selección de Material3 tienen una especificidad muy alta.
+ *
+ * Las variables se declaran en .e-grid (no en html) para que var() se resuelva
+ * con la superficie propia de la grid, que en oscuro se aclara más abajo.
+ */
+.e-grid {
+    --grid-primary: rgb(var(--color-sf-primary));
+    --grid-surface: rgb(var(--color-sf-surface));
+    --grid-header-bg: color-mix(in srgb, var(--grid-primary) 8%, var(--grid-surface));
+    --grid-toolbar-bg: var(--grid-surface);
+    --grid-alt-bg: color-mix(in srgb, var(--grid-primary) 2.5%, var(--grid-surface));
+    --grid-hover-bg: color-mix(in srgb, var(--grid-primary) 8%, var(--grid-surface));
+    --grid-selected-bg: color-mix(in srgb, var(--grid-primary) 18%, var(--grid-surface));
+    --grid-border: color-mix(in srgb, var(--grid-primary) 16%, var(--grid-surface));
+}
+
+/*
+ * En oscuro las grids NO pasan a modo oscuro: dentro de .e-grid se restaura la
+ * paleta clara de Material3 (valores de :root en ej2-base) y el primario claro
+ * del tema (--grid-light-*), con una superficie apenas más oscura que el blanco
+ * para que no deslumbre sobre el panel oscuro.
+ */
+html.e-dark-mode .e-grid {
+    --color-sf-black: 0, 0, 0;
+    --color-sf-white: 255, 255, 255;
+    --color-sf-secondary: 98, 91, 113;
+    --color-sf-secondary-container: 232, 222, 248;
+    --color-sf-tertiary: 125, 82, 96;
+    --color-sf-tertiary-container: 255, 216, 228;
+    --color-sf-background: var(--color-sf-surface);
+    --color-sf-on-secondary: 255, 255, 255;
+    --color-sf-on-secondary-container: 30, 25, 43;
+    --color-sf-on-tertiary: 255, 255, 255;
+    --color-sf-on-tertiary-containe: 55, 11, 30;
+    --color-sf-on-surface: 28, 27, 31;
+    --color-sf-on-surface-variant: 73, 69, 78;
+    --color-sf-on-background: 28, 27, 31;
+    --color-sf-outline: 121, 116, 126;
+    --color-sf-outline-variant: 196, 199, 197;
+    --color-sf-shadow: 0, 0, 0;
+    --color-sf-inverse-surface: 49, 48, 51;
+    --color-sf-inverse-on-surface: 244, 239, 244;
+    --color-sf-scrim: 0, 0, 0;
+    --color-sf-error: 179, 38, 30;
+    --color-sf-error-container: 249, 222, 220;
+    --color-sf-on-error: 255, 250, 250;
+    --color-sf-on-error-container: 65, 14, 11;
+    --color-sf-success: 32, 81, 7;
+    --color-sf-success-container: 209, 255, 186;
+    --color-sf-on-success: 244, 255, 239;
+    --color-sf-on-success-container: 13, 39, 0;
+    --color-sf-info: 1, 87, 155;
+    --color-sf-info-container: 233, 245, 255;
+    --color-sf-on-info: 250, 253, 255;
+    --color-sf-on-info-container: 0, 51, 91;
+    --color-sf-warning: 145, 76, 0;
+    --color-sf-warning-container: 254, 236, 222;
+    --color-sf-on-warning: 255, 255, 255;
+    --color-sf-on-warning-container: 47, 21, 0;
+    --color-sf-spreadsheet-gridline: var(--color-sf-surface-variant);
+    --color-sf-shadow-focus-ring1: 0 0 0 1px rgb(255, 255, 255), 0 0 0 3px rgb(0, 0, 0);
+    --color-sf-success-text: 255, 255, 255;
+    --color-sf-warning-text: 255, 255, 255;
+    --color-sf-info-text: 255, 255, 255;
+    --color-sf-danger-text: 255, 255, 255;
+    --color-sf-diagram-palette-background: --color-sf-white;
+    --color-sf-content-text-color-alt2: var(--color-sf-on-secondary-container);
+    --color-sf-primary: var(--grid-light-primary);
+    --color-sf-on-primary: var(--grid-light-on-primary);
+    --color-sf-primary-container: var(--grid-light-primary-container);
+    --color-sf-on-primary-container: var(--grid-light-on-primary-container);
+    --color-sf-surface-tint-color: var(--grid-light-primary);
+    --color-sf-surface: 236, 237, 241;
+    --color-sf-surface-variant: 228, 230, 235;
+    --grid-header-bg: color-mix(in srgb, var(--grid-primary) 11%, var(--grid-surface));
+    --grid-toolbar-bg: var(--grid-surface);
+    --grid-alt-bg: color-mix(in srgb, var(--grid-primary) 3.5%, var(--grid-surface));
+    --grid-hover-bg: color-mix(in srgb, var(--grid-primary) 10%, var(--grid-surface));
+    --grid-selected-bg: color-mix(in srgb, var(--grid-primary) 26%, var(--grid-surface));
+    --grid-border: color-mix(in srgb, var(--grid-primary) 24%, var(--grid-surface));
+    color-scheme: light;
+    /* Plantillas de la toolbar/celdas heredan el texto claro del panel oscuro. */
+    color: rgb(var(--color-sf-on-surface));
+}
+
+/* Cabecera */
+.e-grid .e-gridheader,
+.e-grid .e-gridheader .e-headercontent,
+.e-grid .e-gridheader th.e-headercell,
+.e-grid .e-gridheader th.e-detailheadercell,
+.e-grid .e-gridheader .e-columnheader .e-leftfreeze,
+.e-grid .e-gridheader .e-columnheader .e-rightfreeze {
+    background: var(--grid-header-bg) !important;
+}
+
+.e-grid .e-gridheader th.e-headercell .e-headertext {
+    font-weight: 600;
+}
+
+.e-grid .e-gridheader {
+    border-bottom-color: var(--grid-border) !important;
+}
+
+/* Fila de filtros: algo más clara que la cabecera para que se lean los inputs */
+.e-grid .e-gridheader .e-filterbar th.e-filterbarcell,
+.e-grid .e-gridheader .e-filterbar th.e-fltrtemp {
+    background: var(--grid-toolbar-bg) !important;
+}
+
+/* Toolbar superior (contenedores izquierda/centro/derecha incluidos, para que no queden franjas de otro tono) */
+.e-grid .e-toolbar,
+.e-grid .e-toolbar .e-toolbar-items,
+.e-grid .e-toolbar .e-toolbar-left,
+.e-grid .e-toolbar .e-toolbar-center,
+.e-grid .e-toolbar .e-toolbar-right,
+.e-grid .e-toolbar .e-hscroll-content,
+.e-grid .e-toolbar .e-toolbar-item {
+    background: var(--grid-toolbar-bg) !important;
+}
+
+/* Cebra */
+.e-grid .e-content tr.e-row.e-altrow td.e-rowcell {
+    background-color: var(--grid-alt-bg) !important;
+}
+
+/* Hover */
+.e-grid.e-gridhover .e-content tr.e-row:not(.e-disable-gridhover):not(.e-detailrow):hover td.e-rowcell:not(.e-cellselectionbackground):not(.e-active) {
+    background: var(--grid-hover-bg) !important;
+}
+
+/* Selección de filas y celdas */
+.e-grid .e-content td.e-rowcell.e-active,
+.e-grid .e-content td.e-rowcell.e-cellselectionbackground {
+    background: var(--grid-selected-bg) !important;
+}
+
+/* Pie de página (paginador) */
+.e-grid .e-gridpager,
+.e-grid .e-gridpager.e-pager,
+.e-grid .e-gridpager .e-pagercontainer,
+.e-grid .e-gridpager .e-parentmsgbar,
+.e-grid .e-gridpager .e-pagesizes {
+    background: var(--grid-header-bg) !important;
+}
+
+.e-grid .e-gridpager {
+    border-top-color: var(--grid-border) !important;
+}
+
+.e-grid .e-gridpager .e-numericitem:not(.e-currentitem),
+.e-grid .e-gridpager .e-pagercontainer .e-icons {
+    background-color: transparent !important;
+}

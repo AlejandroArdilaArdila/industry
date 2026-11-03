@@ -1,0 +1,3602 @@
+{
+    "openapi": "3.0.0",
+    "info": {
+        "title": "Integros POS API",
+        "description": "Servicios propios que hacen de puente entre la app POS y la base de datos de Dolibarr.",
+        "version": "1.0.0"
+    },
+    "paths": {
+        "/api/api.php/integrospos/cashcontrol/aperturaCaja": {
+            "post": {
+                "tags": [
+                    "CashControl"
+                ],
+                "summary": "Registra la apertura (entrada) de caja de un terminal",
+                "operationId": "cb65ba2b5178835ca8aa648558ca04a4",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "properties": {
+                                    "fk_user": {
+                                        "description": "Usuario que abre la caja",
+                                        "type": "integer",
+                                        "example": 1
+                                    },
+                                    "idTerminal": {
+                                        "description": "Terminal/caja del usuario (usado para validar caja abierta)",
+                                        "type": "integer",
+                                        "example": 1
+                                    },
+                                    "base": {
+                                        "description": "Base con la que se abre la caja",
+                                        "type": "number",
+                                        "example": 100000
+                                    },
+                                    "fk_caja_local": {
+                                        "description": "Referencia local (idempotencia)",
+                                        "type": "string",
+                                        "example": "CAJA-LOCAL-001"
+                                    },
+                                    "fecha": {
+                                        "description": "Fecha de apertura (por defecto ahora)",
+                                        "type": "string",
+                                        "format": "date-time"
+                                    },
+                                    "device": {
+                                        "description": "Identificador del dispositivo",
+                                        "type": "string"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Apertura registrada o ya existente (idempotente)",
+                        "content": {
+                            "application/json": {
+                                "schema": {},
+                                "example": {
+                                    "status": 0,
+                                    "message": "Apertura de caja registrada correctamente",
+                                    "rowid": 10,
+                                    "fk_user": 1,
+                                    "fecha_apertura": "2026-07-05 08:00:00",
+                                    "base": 100000,
+                                    "estado": 1,
+                                    "ref_local": "CAJA-LOCAL-001"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "La caja ya se encuentra abierta o no se pudo registrar la apertura"
+                    }
+                }
+            }
+        },
+        "/api/api.php/integrospos/cashcontrol/cajasHoy": {
+            "post": {
+                "tags": [
+                    "CashControl"
+                ],
+                "summary": "Lista las cajas (aperturas/cierres) del día actual para un usuario, con su device_id asociado",
+                "operationId": "ff474b3fe3bfebf4d7ecea1d3be1adc4",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "properties": {
+                                    "fk_user": {
+                                        "description": "Usuario a consultar",
+                                        "type": "integer",
+                                        "example": 1
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Cajas del día para el usuario",
+                        "content": {
+                            "application/json": {
+                                "schema": {},
+                                "example": [
+                                    {
+                                        "ref_local": "CAJA-LOCAL-001",
+                                        "fecha_apertura": "2026-07-06 08:00:00",
+                                        "fecha_cierre": null,
+                                        "estado": 1,
+                                        "deviceid": "DEVICE-01"
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "El campo fk_user es requerido"
+                    }
+                }
+            }
+        },
+        "/api/api.php/integrospos/cashcontrol/movimientos": {
+            "post": {
+                "tags": [
+                    "CashControl"
+                ],
+                "summary": "Lista los movimientos (entradas/salidas de caja) filtrados por caja local y/o usuario",
+                "operationId": "8ffd82c6e7b1faea2ea25879890986f5",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "properties": {
+                                    "fk_caja_local": {
+                                        "description": "Referencia local de la apertura",
+                                        "type": "string",
+                                        "example": "CAJA-LOCAL-001"
+                                    },
+                                    "byUser": {
+                                        "description": "Filtrar por usuario",
+                                        "type": "integer",
+                                        "example": 1
+                                    },
+                                    "cerrado": {
+                                        "description": "Si es true, solo incluye movimientos de cajas actualmente abiertas (estado=1)",
+                                        "type": "boolean"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Movimientos encontrados",
+                        "content": {
+                            "application/json": {
+                                "schema": {},
+                                "example": {
+                                    "fk_caja_local": "CAJA-LOCAL-001",
+                                    "total": 1,
+                                    "movimientos": [
+                                        {
+                                            "id": 1,
+                                            "ref": "ES-0001",
+                                            "monto": 50000,
+                                            "tipo": 1,
+                                            "fecha": "2026-07-06 10:00:00",
+                                            "descripcion": "Retiro de caja",
+                                            "ref_local": "ES-LOCAL-0001",
+                                            "fk_client": 0,
+                                            "nombre_cliente": "",
+                                            "fk_product": null,
+                                            "label_product": "",
+                                            "fk_caja_local": "CAJA-LOCAL-001",
+                                            "metodos_pago": []
+                                        }
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Se requiere fk_caja_local o byUser"
+                    },
+                    "404": {
+                        "description": "No se encontró la caja con ese ref_local"
+                    }
+                }
+            }
+        },
+        "/api/api.php/integrospos/cashcontrol/cajaObservacion": {
+            "post": {
+                "tags": [
+                    "CashControl"
+                ],
+                "summary": "Agrega una observación al historial (log) de una caja, identificada por su ref_local",
+                "operationId": "6dd31300dacfbb2484919fec15ad40d6",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "properties": {
+                                    "fk_caja_local": {
+                                        "description": "Referencia local de la caja",
+                                        "type": "string",
+                                        "example": "CAJA-LOCAL-001"
+                                    },
+                                    "observacion": {
+                                        "description": "Texto de la observación",
+                                        "type": "string",
+                                        "example": "Faltante de $5.000 en el cuadre"
+                                    },
+                                    "device": {
+                                        "description": "Identificador del dispositivo",
+                                        "type": "string"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Observación registrada correctamente",
+                        "content": {
+                            "application/json": {
+                                "schema": {},
+                                "example": {
+                                    "status": 0,
+                                    "message": "Observación registrada correctamente",
+                                    "observacion": [
+                                        {
+                                            "obs": "Faltante de $5.000 en el cuadre",
+                                            "fecha": "2026-07-06 10:00:00",
+                                            "deviceid": "DEVICE-01"
+                                        }
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Se requieren fk_caja_local y observacion"
+                    },
+                    "404": {
+                        "description": "No se encontró la caja con ese ref_local"
+                    }
+                }
+            }
+        },
+        "/api/api.php/integrospos/cashcontrol/getCierreCaja": {
+            "post": {
+                "tags": [
+                    "CashControl"
+                ],
+                "summary": "Genera el resumen (preview) de cierre de caja de la apertura activa de un terminal, sin cerrarla",
+                "operationId": "08764d5b58c2a8b477e7e4f7005e114e",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "properties": {
+                                    "idTerminal": {
+                                        "description": "Usuario/terminal a consultar",
+                                        "type": "integer",
+                                        "example": 1
+                                    },
+                                    "device": {
+                                        "description": "Identificador del dispositivo (opcional, filtra la apertura activa)",
+                                        "type": "string"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Resumen de cierre de caja",
+                        "content": {
+                            "application/json": {
+                                "schema": {},
+                                "example": {
+                                    "totalVentas": 250000,
+                                    "totalAperturaCaja": 100000,
+                                    "fechaApertura": "2026-07-05 08:00:00",
+                                    "ref_local": "CAJA-LOCAL-001",
+                                    "device_ape": "DEVICE-01",
+                                    "observacion": null,
+                                    "mEfectivo": 150000,
+                                    "mTransferencia": 100000,
+                                    "totalEntradas": 0,
+                                    "totalSalidas": 0,
+                                    "ventasTotales": [
+                                        {
+                                            "idMetodo": 1,
+                                            "tipo": "EFECTIVO",
+                                            "valor": 150000
+                                        }
+                                    ],
+                                    "cantidadFacturas": {
+                                        "POS": {
+                                            "cantidad": 5,
+                                            "valor": 120000
+                                        },
+                                        "ELECTRONICAS": {
+                                            "cantidad": 3,
+                                            "valor": 80000
+                                        },
+                                        "BORRADOR": {
+                                            "cantidad": 0,
+                                            "valor": 0
+                                        },
+                                        "NOTAS_CREDITO": {
+                                            "cantidad": 1,
+                                            "valor": 10000
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "No se encontró apertura de caja activa"
+                    }
+                }
+            }
+        },
+        "/api/api.php/integrospos/cashcontrol/cierreCaja": {
+            "post": {
+                "tags": [
+                    "CashControl"
+                ],
+                "summary": "Cierra la caja (apertura activa) de un terminal y devuelve el resumen completo del cierre",
+                "operationId": "dd6f1c44f1d8c447b2b4228988357d32",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "properties": {
+                                    "fk_user": {
+                                        "description": "Usuario que cierra la caja",
+                                        "type": "integer",
+                                        "example": 1
+                                    },
+                                    "fk_caja_local": {
+                                        "description": "Referencia local de la apertura a cerrar",
+                                        "type": "string",
+                                        "example": "CAJA-LOCAL-001"
+                                    },
+                                    "device": {
+                                        "description": "Identificador del dispositivo",
+                                        "type": "string"
+                                    },
+                                    "fecha": {
+                                        "description": "Fecha de cierre (por defecto ahora)",
+                                        "type": "string",
+                                        "format": "date-time"
+                                    },
+                                    "cajero": {
+                                        "description": "Monto contado por el cajero",
+                                        "type": "number"
+                                    },
+                                    "efectivo_entregado": {
+                                        "description": "Efectivo entregado al cierre",
+                                        "type": "number"
+                                    },
+                                    "datos": {
+                                        "description": "Datos crudos del POS (facturas, notas, entradas/salidas)",
+                                        "type": "object"
+                                    },
+                                    "cierreCaja": {
+                                        "description": "Resumen previo obtenido de getCierreCaja",
+                                        "properties": {
+                                            "totalVentas": {
+                                                "type": "number",
+                                                "example": 250000
+                                            },
+                                            "ventasTotales": {
+                                                "type": "array",
+                                                "items": {}
+                                            }
+                                        },
+                                        "type": "object"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Cierre registrado correctamente",
+                        "content": {
+                            "application/json": {
+                                "schema": {},
+                                "example": {
+                                    "status": 0,
+                                    "message": "Cierre de caja realizado correctamente",
+                                    "error": "Cierre de caja realizado correctamente",
+                                    "rowid": 10,
+                                    "nombreEmpresa": "Mi Empresa",
+                                    "monto_contado_cajero": 250000,
+                                    "cierre": {
+                                        "rowid": 10,
+                                        "totalVentas": 250000
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "No se encontró ninguna caja abierta para este usuario"
+                    },
+                    "403": {
+                        "description": "No se pudo registrar el cierre de caja"
+                    }
+                }
+            }
+        },
+        "/api/custom/integrospos/login.php": {
+            "post": {
+                "tags": [
+                    "Auth"
+                ],
+                "summary": "Inicia sesion con las credenciales del usuario en Dolibarr y emite un access/refresh token",
+                "description": "POST /api/auth/login\nBody: { login, password, device_name }",
+                "operationId": "74690e64431c135b76a1a21f9dc65516",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "login",
+                                    "password",
+                                    "device_name"
+                                ],
+                                "properties": {
+                                    "login": {
+                                        "type": "string",
+                                        "example": "Integros365"
+                                    },
+                                    "password": {
+                                        "type": "string",
+                                        "format": "password"
+                                    },
+                                    "device_name": {
+                                        "description": "Identificador/nombre estable del dispositivo o terminal desde el que se inicia sesion. Es a la vez el \"slot\" del token (un token activo por device_name, se revoca el anterior con ese mismo nombre) y el identificador usado para bloquear sesiones concurrentes en otro dispositivo.",
+                                        "type": "string",
+                                        "example": "caja-1"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Sesion emitida. Copia el access_token y pegalo en el boton Authorize (SanctumToken) para probar las rutas protegidas.",
+                        "content": {
+                            "application/json": {
+                                "schema": {},
+                                "example": {
+                                    "access_token": "9f1c2a7b3e4d5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a",
+                                    "refresh_token": "a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1",
+                                    "expires_at": "2026-07-07 00:00:00",
+                                    "device_id": "caja-1",
+                                    "user_id": "1",
+                                    "APIKEY": "GX8g3Y7N2vxv4KDc9Zlb43lNs0O9WknL",
+                                    "apertura": true,
+                                    "cierre": false,
+                                    "continuar": true
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Body vacio o con JSON invalido"
+                    },
+                    "403": {
+                        "description": "Parametros incompletos, credenciales invalidas, usuario inactivo, sin api_key o sin terminal configurada"
+                    },
+                    "423": {
+                        "description": "El usuario ya tiene una sesion activa en otro dispositivo (con distinto device_name)"
+                    }
+                }
+            }
+        },
+        "/api/custom/integrospos/refresh": {
+            "post": {
+                "tags": [
+                    "Auth"
+                ],
+                "summary": "Renueva la sesion (rota access_token y refresh_token) a partir de un refresh_token valido",
+                "description": "POST /custom/integrospos/refresh\nBody: { refresh_token }",
+                "operationId": "765908de32bc64d48741e9d1bfb880e5",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "refresh_token"
+                                ],
+                                "properties": {
+                                    "refresh_token": {
+                                        "type": "string"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Nueva sesion emitida (mismo formato que /login)"
+                    },
+                    "401": {
+                        "description": "Refresh token invalido o expirado"
+                    }
+                }
+            }
+        },
+        "/api/custom/integrospos/me": {
+            "get": {
+                "tags": [
+                    "Auth"
+                ],
+                "summary": "Datos del usuario autenticado (Dolibarr) segun el access_token enviado",
+                "description": "GET /custom/integrospos/me  (requiere token)",
+                "operationId": "ca2cdd45ad917ecf208943979379aaba",
+                "responses": {
+                    "200": {
+                        "description": "Usuario de Dolibarr asociado al token"
+                    },
+                    "401": {
+                        "description": "Token invalido, expirado o ausente"
+                    }
+                },
+                "security": [
+                    {
+                        "SanctumToken": []
+                    }
+                ]
+            }
+        },
+        "/api/custom/integrospos/logout": {
+            "post": {
+                "tags": [
+                    "Auth"
+                ],
+                "summary": "Cierra la sesion del usuario (revoca el access_token si vino uno, y cierra el registro de pos_login_logout)",
+                "description": "POST /custom/integrospos/logout  (requiere DOLAPIKEY o access_token)",
+                "operationId": "0dc21d0db6b272685b000b5fd31ce05b",
+                "responses": {
+                    "200": {
+                        "description": "Sesion cerrada (revisar la presencia de \"error\": no significa que el token no se haya revocado, solo que no habia un registro de pos_login_logout abierto para este usuario)",
+                        "content": {
+                            "application/json": {
+                                "schema": {},
+                                "example": {
+                                    "success": true,
+                                    "user_id": 1,
+                                    "date_logout": "2026-07-08 15:45:00"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Faltan credenciales: ni DOLAPIKEY ni access_token identifican a un usuario"
+                    }
+                },
+                "security": [
+                    {
+                        "SanctumToken": []
+                    },
+                    {
+                        "DolApiKey": []
+                    }
+                ]
+            }
+        },
+        "/api/api.php/integrospos/customers/clients": {
+            "post": {
+                "tags": [
+                    "Clientes"
+                ],
+                "summary": "Busca clientes (terceros) del POS, con ciudad, medio/termino de pago y puntos de fidelizacion",
+                "operationId": "44f919e7349cad930f83e65312f64e8e",
+                "requestBody": {
+                    "required": false,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "properties": {
+                                    "byNombre": {
+                                        "description": "Filtra por nombre (LIKE)",
+                                        "type": "string",
+                                        "example": "Juan Perez"
+                                    },
+                                    "byId": {
+                                        "description": "Filtra por rowid exacto (si se envia, ignora los demas filtros)",
+                                        "type": "integer",
+                                        "example": 3
+                                    },
+                                    "byDocument": {
+                                        "description": "Filtra por documento exacto (siren o code_client segun configuracion)",
+                                        "type": "string",
+                                        "example": "900123456"
+                                    },
+                                    "orderBy": {
+                                        "type": "string",
+                                        "enum": [
+                                            "rowid",
+                                            "nom",
+                                            "siren",
+                                            "zip",
+                                            "price_level",
+                                            "remise_client",
+                                            "phone",
+                                            "email"
+                                        ]
+                                    },
+                                    "orderType": {
+                                        "type": "string",
+                                        "enum": [
+                                            "ASC",
+                                            "DESC"
+                                        ]
+                                    },
+                                    "limit": {
+                                        "description": "Limite de resultados",
+                                        "type": "integer"
+                                    },
+                                    "fk_vendedor": {
+                                        "description": "Solo clientes asignados a este vendedor (societe_commerciaux)",
+                                        "type": "integer",
+                                        "example": 5
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Listado de clientes",
+                        "content": {
+                            "application/json": {
+                                "schema": {},
+                                "example": [
+                                    {
+                                        "rowid": 3,
+                                        "nom": "Cliente generico",
+                                        "typent": 0,
+                                        "address": "Calle 1 # 2-3",
+                                        "phone": 3001234567,
+                                        "email": "cliente@example.com",
+                                        "siren": "900123456",
+                                        "zipcode": 50001,
+                                        "fk_departement": 5,
+                                        "iva": 1,
+                                        "depto": "Antioquia",
+                                        "code": "05001",
+                                        "code_depto": "05",
+                                        "ciudad": "Medellin",
+                                        "tipoDocumento": "31",
+                                        "aplicaPuntos": true,
+                                        "historicoPuntos": 0,
+                                        "puntosRedimibles": 0,
+                                        "proximosVencer": 0,
+                                        "fechaProximosVencer": "2026-07-31 23:59:59",
+                                        "descuentoGlobal": 0,
+                                        "listaPrecios": 0,
+                                        "medioPagoId": 1,
+                                        "medioPago": "Efectivo",
+                                        "terminoPagoId": null,
+                                        "terminoPago": null
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Falta DOLAPIKEY o el usuario no tiene el permiso 'backend' de integrospos"
+                    }
+                },
+                "security": [
+                    {
+                        "DolApiKey": []
+                    }
+                ]
+            }
+        },
+        "/api/api.php/integrospos/customers/createClientPos": {
+            "post": {
+                "tags": [
+                    "Clientes"
+                ],
+                "summary": "Crea un cliente (tercero) del POS",
+                "operationId": "b5049f473a3a41ed729c15f053965e7d",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "properties": {
+                                    "nombreCliente": {
+                                        "type": "string",
+                                        "example": "Juan Perez"
+                                    },
+                                    "documento": {
+                                        "description": "Numero de documento (siren); al crear debe ser unico",
+                                        "type": "string",
+                                        "example": "900123456"
+                                    },
+                                    "tipoDocumento": {
+                                        "description": "CC o NIT",
+                                        "type": "string",
+                                        "example": "CC"
+                                    },
+                                    "tipoEmpresa": {
+                                        "description": "fk_typent",
+                                        "type": "integer",
+                                        "example": 0
+                                    },
+                                    "direccion": {
+                                        "type": "string",
+                                        "example": "Calle 1 # 2-3"
+                                    },
+                                    "correo": {
+                                        "type": "string",
+                                        "example": "cliente@example.com"
+                                    },
+                                    "telefono": {
+                                        "type": "string",
+                                        "example": "3001234567"
+                                    },
+                                    "ciudad": {
+                                        "description": "nombre exacto en c_ciudades",
+                                        "type": "string",
+                                        "example": "Medellin"
+                                    },
+                                    "codeCiudad": {
+                                        "description": "code de c_ciudades_fe",
+                                        "type": "string",
+                                        "example": "05001"
+                                    },
+                                    "departamento": {
+                                        "description": "nombre exacto en c_departements",
+                                        "type": "string",
+                                        "example": "Antioquia"
+                                    },
+                                    "codeDepto": {
+                                        "description": "code de c_departements",
+                                        "type": "string",
+                                        "example": "05"
+                                    },
+                                    "zipcode": {
+                                        "description": "zipcode",
+                                        "type": "integer",
+                                        "example": "50013"
+                                    },
+                                    "clasificacionTributaria": {
+                                        "description": "Solo se usa al crear",
+                                        "type": "string"
+                                    },
+                                    "aplicaPuntos": {
+                                        "description": "Solo aplica si el modulo FIDELIZACION esta activo",
+                                        "type": "boolean"
+                                    },
+                                    "Responsableva": {
+                                        "description": "tva_assuj",
+                                        "type": "integer",
+                                        "example": 0
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Cliente creado o editado",
+                        "content": {
+                            "application/json": {
+                                "schema": {},
+                                "example": {
+                                    "status": 1,
+                                    "msg": "Cliente creado correctamente",
+                                    "idClient": 10
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Falta DOLAPIKEY, el usuario no tiene el permiso 'backend', el documento ya existe, el idCliente no existe o no esta activo, o los datos enviados son incorrectos"
+                    }
+                },
+                "security": [
+                    {
+                        "DolApiKey": []
+                    }
+                ]
+            }
+        },
+        "/api/api.php/integrospos/customers/updateClientPos": {
+            "post": {
+                "tags": [
+                    "Clientes"
+                ],
+                "summary": "Edita un cliente (tercero) del POS",
+                "operationId": "17e1f1a19a0c651e12e68e2623fde06e",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "properties": {
+                                    "idCliente": {
+                                        "description": "Si se envia, edita ese cliente en vez de crear uno nuevo",
+                                        "type": "integer",
+                                        "example": 10
+                                    },
+                                    "nombreCliente": {
+                                        "type": "string",
+                                        "example": "Juan Perez"
+                                    },
+                                    "documento": {
+                                        "description": "Numero de documento (siren); al crear debe ser unico",
+                                        "type": "string",
+                                        "example": "900123456"
+                                    },
+                                    "tipoDocumento": {
+                                        "description": "CC o NIT",
+                                        "type": "string",
+                                        "example": "CC"
+                                    },
+                                    "tipoEmpresa": {
+                                        "description": "fk_typent",
+                                        "type": "integer",
+                                        "example": 0
+                                    },
+                                    "direccion": {
+                                        "type": "string",
+                                        "example": "Calle 1 # 2-3"
+                                    },
+                                    "correo": {
+                                        "type": "string",
+                                        "example": "cliente@example.com"
+                                    },
+                                    "telefono": {
+                                        "type": "string",
+                                        "example": "3001234567"
+                                    },
+                                    "ciudad": {
+                                        "description": "nombre exacto en c_ciudades",
+                                        "type": "string",
+                                        "example": "Medellin"
+                                    },
+                                    "codeCiudad": {
+                                        "description": "code de c_ciudades_fe",
+                                        "type": "string",
+                                        "example": "05001"
+                                    },
+                                    "codeDepto": {
+                                        "description": "code de c_departements",
+                                        "type": "string",
+                                        "example": "05"
+                                    },
+                                    "departamento": {
+                                        "description": "nombre exacto en c_departements",
+                                        "type": "string",
+                                        "example": "Antioquia"
+                                    },
+                                    "zipcode": {
+                                        "description": "zipcode",
+                                        "type": "integer",
+                                        "example": "50013"
+                                    },
+                                    "clasificacionTributaria": {
+                                        "description": "Solo se usa al crear",
+                                        "type": "string"
+                                    },
+                                    "aplicaPuntos": {
+                                        "description": "Solo aplica si el modulo FIDELIZACION esta activo",
+                                        "type": "boolean"
+                                    },
+                                    "Responsableva": {
+                                        "description": "tva_assuj",
+                                        "type": "integer",
+                                        "example": 0
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Cliente creado o editado",
+                        "content": {
+                            "application/json": {
+                                "schema": {},
+                                "example": {
+                                    "status": 1,
+                                    "msg": "Cliente creado correctamente",
+                                    "idClient": 10
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Falta DOLAPIKEY, el usuario no tiene el permiso 'backend', el documento ya existe, el idCliente no existe o no esta activo, o los datos enviados son incorrectos"
+                    }
+                },
+                "security": [
+                    {
+                        "DolApiKey": []
+                    }
+                ]
+            }
+        },
+        "/api/api.php/integrospos/pos/client/pendingInvoices": {
+            "post": {
+                "tags": [
+                    "Clientes"
+                ],
+                "summary": "Cartera pendiente y cupo de credito de un cliente, buscado por numero de documento (siren)",
+                "operationId": "a5086f643541e31bc9535ef4f6742290",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "properties": {
+                                    "documentoId": {
+                                        "type": "string",
+                                        "example": "222222222222"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Cupo de credito del cliente y sus facturas con saldo pendiente",
+                        "content": {
+                            "application/json": {
+                                "schema": {},
+                                "example": {
+                                    "status": 200,
+                                    "cliente": {
+                                        "rowid": 3,
+                                        "nombre": "Cliente generico",
+                                        "direccion": "Calle 1 # 2-3",
+                                        "telefono": "3001234567",
+                                        "cupo_autorizado": 1000000,
+                                        "cupo_utilizado": 250000,
+                                        "cupo_disponible": 750000,
+                                        "diasPlazoCupo": 30
+                                    },
+                                    "facturas_pendientes": [
+                                        {
+                                            "factura_id": 45,
+                                            "ref": "FA2601-0001",
+                                            "total_factura": 250000,
+                                            "abonos": 0,
+                                            "saldo_pendiente": 250000,
+                                            "fecha_factura": "2026-07-01",
+                                            "fecha_vencimiento": "2026-07-31",
+                                            "dias_vencidos": -24
+                                        }
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "El parametro documentoId es requerido"
+                    },
+                    "401": {
+                        "description": "Falta DOLAPIKEY o el usuario no tiene el permiso 'backend'"
+                    },
+                    "404": {
+                        "description": "No se encontro un cliente con ese documento"
+                    }
+                },
+                "security": [
+                    {
+                        "DolApiKey": []
+                    }
+                ]
+            }
+        },
+        "/api/api.php/integrospos/puntosfidelizacion/redimirPuntos": {
+            "post": {
+                "tags": [
+                    "Clientes"
+                ],
+                "summary": "Redime puntos de fidelizacion de un cliente, tomandolos de los lotes mas proximos a vencer primero",
+                "operationId": "bf5ca455701beeab2c3e3a8ad2616034",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "properties": {
+                                    "puntos": {
+                                        "description": "Cantidad de puntos a redimir",
+                                        "type": "integer",
+                                        "example": 500
+                                    },
+                                    "idCliente": {
+                                        "type": "integer",
+                                        "example": 3
+                                    },
+                                    "idProducto": {
+                                        "description": "Producto por el que se redimen los puntos",
+                                        "type": "integer",
+                                        "example": 45
+                                    },
+                                    "idUser": {
+                                        "description": "Usuario que registra la redencion",
+                                        "type": "integer",
+                                        "example": 1
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Resultado de la redencion (revisar \"status\": 0 = redimido, 1 = no se pudo redimir)",
+                        "content": {
+                            "application/json": {
+                                "schema": {},
+                                "example": {
+                                    "message": "500 puntos redimidos",
+                                    "status": 0,
+                                    "fecha": "2026-07-08 3:45pm"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "DolApiKey": []
+                    }
+                ]
+            }
+        },
+        "/api/api.php/integrospos/puntosfidelizacion/productoPuntos": {
+            "post": {
+                "tags": [
+                    "Clientes"
+                ],
+                "summary": "Datos minimos de un producto redimible por puntos, buscado por referencia o codigo de barras exacto",
+                "operationId": "2a169bf70f9761cc6d2b6286650b0cb4",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "properties": {
+                                    "producto": {
+                                        "description": "Referencia o codigo de barras exacto",
+                                        "type": "string",
+                                        "example": "COCA400"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Producto encontrado",
+                        "content": {
+                            "application/json": {
+                                "schema": {},
+                                "example": {
+                                    "existe": true,
+                                    "label": "Coca Cola 400ml",
+                                    "rowid": 45,
+                                    "price_min_ttc": 2500,
+                                    "cantidad_puntos": 100
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "No se encontro el producto",
+                        "content": {
+                            "application/json": {
+                                "schema": {},
+                                "example": {
+                                    "existe": false,
+                                    "label": "",
+                                    "rowid": 0,
+                                    "price_min_ttc": 0,
+                                    "cantidad_puntos": 0
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "DolApiKey": []
+                    }
+                ]
+            }
+        },
+        "/api/api.php/integrospos/pos/configuracion": {
+            "post": {
+                "tags": [
+                    "Configuracion"
+                ],
+                "summary": "Configuracion del POS para el usuario autenticado por DOLAPIKEY",
+                "operationId": "d7cdcfd4e618458e0b65f9f63ba51732",
+                "responses": {
+                    "200": {
+                        "description": "Configuracion completa del POS: datos de la empresa, terminal, permisos del usuario, metodos de pago, domicilios y flags globales",
+                        "content": {
+                            "application/json": {
+                                "schema": {},
+                                "example": {
+                                    "empresa": "Mi Empresa SAS",
+                                    "nit": "900123456",
+                                    "tipoIdentificacion": "9001234561",
+                                    "code": "05001",
+                                    "url": "https://miempresa.com",
+                                    "ciudad": "Medellin(Antioquia)",
+                                    "logo": "/viewimage.php?modulepart=mycompany&file=logos/thumbs/logo_small.png",
+                                    "direccion": "Calle 1 # 2-3",
+                                    "telefono": "3001234567",
+                                    "idUser": 1,
+                                    "idTerminal": 2,
+                                    "idCliente": 3,
+                                    "documentoCliente": 900123456,
+                                    "nombreCliente": "Cliente generico",
+                                    "idVendedor": 1,
+                                    "codigoVendedor": 1,
+                                    "nombreVendedor": "Andres Ardila",
+                                    "mensajeAlerta": "",
+                                    "cierreCaja": false,
+                                    "aperturaCaja": true,
+                                    "reAperturaCaja": false,
+                                    "tiempoSegundosAlertas": 0,
+                                    "pinCajon": false,
+                                    "pinRimprimir": false,
+                                    "pinDevoluciones": false,
+                                    "pinSumarRestar": false,
+                                    "pinEliminar": false,
+                                    "fidelizacion": false,
+                                    "domiciliosHabilitado": true,
+                                    "domicilios": [],
+                                    "controlStock": true,
+                                    "crearproductos": false,
+                                    "editarprecios": false,
+                                    "almacenes": [
+                                        {
+                                            "rowid": 1,
+                                            "almacen": "PRINCIPAL"
+                                        }
+                                    ],
+                                    "metodos": [
+                                        {
+                                            "id": 1,
+                                            "code": "LIQ",
+                                            "metodo": "Efectivo"
+                                        }
+                                    ],
+                                    "mostrarImagenes": false,
+                                    "altoFilas": 0,
+                                    "cierreCajaPos": false,
+                                    "cierreCajaDetallado": false,
+                                    "crearClientes": false,
+                                    "printLabels": false,
+                                    "descuentoGlobal": false,
+                                    "aplicaDevoluciones": true,
+                                    "separadorBusqueda": "No configurado",
+                                    "pedidosProvisionales": false,
+                                    "facturaElectronica": false,
+                                    "facturaPos": true,
+                                    "facturaBorrador": false,
+                                    "facturaElectronicaColor": "#ffffff",
+                                    "facturaPosColor": "#ffffff",
+                                    "facturaBorradorColor": "#ffffff",
+                                    "facturaPredeterminada": "No configurado",
+                                    "nivelPrecioPin": "No configurado",
+                                    "nivelPrecioPinUsuario": false,
+                                    "tipoAplicacionPromociones": "No configurado",
+                                    "pedidosEspera": 3,
+                                    "abonoFacturas": false,
+                                    "entradasSalidas": false,
+                                    "redencionPuntos": false,
+                                    "datafonoConfig": [
+                                        {
+                                            "urlToken": "",
+                                            "urlCompra": "",
+                                            "urlConsulta": "",
+                                            "username": "",
+                                            "password": "",
+                                            "client_id": "",
+                                            "grant_type": "",
+                                            "client_secret": "",
+                                            "codigoDeComercio": "",
+                                            "codigoDeTerminal": "",
+                                            "idCajero": "",
+                                            "numeroDeCaja": "",
+                                            "metodoPago": "",
+                                            "tiempoValidacion": 0
+                                        }
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Falta el header DOLAPIKEY, la clave no corresponde a ningun usuario activo, o el usuario no tiene terminal asignado"
+                    }
+                },
+                "security": [
+                    {
+                        "DolApiKey": []
+                    }
+                ]
+            }
+        },
+        "/api/api.php/integrospos/customers/posapi/departamentos": {
+            "post": {
+                "tags": [
+                    "Configuracion"
+                ],
+                "summary": "Departamentos y ciudades (con codigo DIAN) para formularios de domicilio",
+                "operationId": "d8c205d1f6f73bef10d379741af677f2",
+                "responses": {
+                    "200": {
+                        "description": "Listado de departamentos y ciudades activos",
+                        "content": {
+                            "application/json": {
+                                "schema": {},
+                                "example": {
+                                    "departamentos": [
+                                        {
+                                            "code_depto": "05",
+                                            "depto": "Antioquia"
+                                        },
+                                        {
+                                            "code_depto": "11",
+                                            "depto": "Bogotá, D.C."
+                                        }
+                                    ],
+                                    "ciudades": [
+                                        {
+                                            "rowid": "80",
+                                            "code_depto": "05",
+                                            "code": "05001",
+                                            "ciudad": "Medellin",
+                                            "zip": "050013"
+                                        },
+                                        {
+                                            "rowid": "169",
+                                            "code_depto": "11",
+                                            "code": "11001",
+                                            "ciudad": "Bogotá, D.C.",
+                                            "zip": "111511"
+                                        }
+                                    ]
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/api.php/integrospos/pos/getCategorieIva": {
+            "get": {
+                "tags": [
+                    "Configuracion"
+                ],
+                "summary": "Catalogos de categorias de producto, tarifas de IVA/impoconsumo y unidades de peso/volumen",
+                "operationId": "740ccbbdd2d9a4b7773614636f0be51d",
+                "responses": {
+                    "200": {
+                        "description": "Catalogos para el formulario de creacion/edicion de productos",
+                        "content": {
+                            "application/json": {
+                                "schema": {},
+                                "example": {
+                                    "ivas": [
+                                        {
+                                            "valor": "0",
+                                            "label": "Excento"
+                                        },
+                                        {
+                                            "valor": "19",
+                                            "label": "19"
+                                        },
+                                        {
+                                            "valor": "5",
+                                            "label": "5"
+                                        }
+                                    ],
+                                    "categorias": [
+                                        {
+                                            "valor": "1",
+                                            "label": "Abarrotes"
+                                        },
+                                        {
+                                            "valor": "2",
+                                            "label": "Licores 1"
+                                        }
+                                    ],
+                                    "peso": [
+                                        {
+                                            "valor": 0,
+                                            "label": "kg"
+                                        },
+                                        {
+                                            "valor": -3,
+                                            "label": "g"
+                                        }
+                                    ],
+                                    "volumen": [
+                                        {
+                                            "valor": 0,
+                                            "label": "m3"
+                                        },
+                                        {
+                                            "valor": 98,
+                                            "label": "L"
+                                        }
+                                    ]
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/api.php/integrospos/pos/update/check": {
+            "post": {
+                "tags": [
+                    "Configuracion"
+                ],
+                "summary": "Version/build/changelog disponible del POS de escritorio, con sus URLs de descarga",
+                "operationId": "a0d077f02b42a44e4fc65ecdcd23228d",
+                "responses": {
+                    "200": {
+                        "description": "Datos de la ultima version publicada",
+                        "content": {
+                            "application/json": {
+                                "schema": {},
+                                "example": {
+                                    "version": "4.4.51",
+                                    "build": 404051,
+                                    "changelog": "- Tirillas de impresión Dinámicas desde ERP\n- Cambio de precio administrador en las cajas\n- Cierre de caja para usuarios que no son administradores.",
+                                    "forzar": true,
+                                    "windows_url": "https://api-a.integros365.com/pos.exe",
+                                    "linux_url": "https://api-a.integros365.com/pos.deb"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "No se encontro el archivo de version"
+                    },
+                    "500": {
+                        "description": "El archivo de version tiene un JSON invalido"
+                    }
+                }
+            }
+        },
+        "/api/api.php/integrospos/pos/ticket/domicilio": {
+            "post": {
+                "tags": [
+                    "Domicilio"
+                ],
+                "summary": "Confirma una factura del POS como pedido a domicilio",
+                "operationId": "9e572d137d3910e46cd50f1fffe48e23",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "properties": {
+                                    "ref": {
+                                        "description": "Referencia de la factura",
+                                        "type": "string",
+                                        "example": "FA2601-0001"
+                                    },
+                                    "direccionEntrega": {
+                                        "type": "string",
+                                        "example": "Calle 1 # 2-3"
+                                    },
+                                    "telefonoEntrega": {
+                                        "type": "string",
+                                        "example": "3001234567"
+                                    },
+                                    "detalleEntrega": {
+                                        "type": "string",
+                                        "example": "Torre 2, apto 301"
+                                    },
+                                    "numeroBolsas": {
+                                        "type": "integer",
+                                        "example": 2
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Domicilio confirmado",
+                        "content": {
+                            "application/json": {
+                                "schema": {},
+                                "example": {
+                                    "message": "Domicilio confirmado",
+                                    "status": 0
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Falta DOLAPIKEY, el usuario no tiene el permiso 'backend', la factura no existe, ya tiene domicilio confirmado, o los datos enviados son incorrectos"
+                    }
+                },
+                "security": [
+                    {
+                        "DolApiKey": []
+                    }
+                ]
+            }
+        },
+        "/api/api.php/integrospos/domicilios/getDomiciliosPos": {
+            "post": {
+                "tags": [
+                    "Domicilio"
+                ],
+                "summary": "Listado paginado de domicilios, con datos de la factura, el vendedor y el domiciliario asignado",
+                "operationId": "58e1b374a00e7fa43747bd296c05a591",
+                "requestBody": {
+                    "required": false,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "properties": {
+                                    "where": {
+                                        "description": "Filtros estilo Syncfusion DataManager sobre columnas de domicilios",
+                                        "type": "array",
+                                        "items": {
+                                            "type": "object"
+                                        }
+                                    },
+                                    "sorted": {
+                                        "description": "Orden estilo Syncfusion: [{name, direction}]",
+                                        "type": "array",
+                                        "items": {
+                                            "type": "object"
+                                        }
+                                    },
+                                    "skip": {
+                                        "type": "integer",
+                                        "example": 0
+                                    },
+                                    "take": {
+                                        "type": "integer",
+                                        "example": 50
+                                    },
+                                    "date_valid_ini": {
+                                        "type": "string",
+                                        "example": "2026-07-01"
+                                    },
+                                    "date_valid": {
+                                        "type": "string",
+                                        "example": "2026-07-31"
+                                    },
+                                    "domiciliario": {
+                                        "description": "'T' para todos los domiciliarios, o el rowid de un domiciliario especifico",
+                                        "type": "string",
+                                        "example": "T"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Listado de domicilios",
+                        "content": {
+                            "application/json": {
+                                "schema": {},
+                                "example": {
+                                    "rowData": [
+                                        {
+                                            "rowid": 1,
+                                            "fk_facture": 10,
+                                            "direccion_entrega": "Calle 1 # 2-3",
+                                            "telefono_entrega": "3001234567",
+                                            "detalle_entrega": "Torre 2, apto 301",
+                                            "numero_bolsas": 2,
+                                            "fk_tipo_domicilio": 1,
+                                            "estado": 1,
+                                            "fk_domiciliario": 5,
+                                            "fecha_asignacion": "2026-07-07 10:00:00",
+                                            "fecha_entrega": null,
+                                            "comentario": null,
+                                            "auditoria": null,
+                                            "ref": "FA2601-0001",
+                                            "datec": "2026-07-07 09:00:00",
+                                            "total_ttc": 50000,
+                                            "idVendedor": 1,
+                                            "nomVendedor": "Andres Ardila",
+                                            "nomDomiciliario": "Carlos Perez"
+                                        }
+                                    ],
+                                    "rowCount": 1
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Falta DOLAPIKEY o la clave no corresponde a ningun usuario activo"
+                    }
+                },
+                "security": [
+                    {
+                        "DolApiKey": []
+                    }
+                ]
+            }
+        },
+        "/api/api.php/integrospos/entradasalidas/serviciosCorresponsal": {
+            "post": {
+                "tags": [
+                    "Entradasalidas"
+                ],
+                "summary": "Productos configurados como servicio de corresponsal bancario (consignacion/retiro), agrupados por tipo",
+                "operationId": "35da321a53c1e32ee0761669ba6a57e7",
+                "responses": {
+                    "200": {
+                        "description": "Productos agrupados por tipo de servicio de corresponsal",
+                        "content": {
+                            "application/json": {
+                                "schema": {},
+                                "example": {
+                                    "status": 0,
+                                    "consignacion": [
+                                        {
+                                            "rowid": 10,
+                                            "ref": "CONS-NEQUI",
+                                            "label": "Consignación Nequi"
+                                        }
+                                    ],
+                                    "retiro": [
+                                        {
+                                            "rowid": 11,
+                                            "ref": "RET-NEQUI",
+                                            "label": "Retiro Nequi"
+                                        }
+                                    ],
+                                    "mal_configurado": []
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/api.php/integrospos/pos/backup/entradaSalida": {
+            "post": {
+                "tags": [
+                    "Backup"
+                ],
+                "summary": "Respaldo/bitacora de una entrada/salida de caja confirmada en el POS offline (Flutter) - llamada adicional, en paralelo al sync de negocio de entradasalidas/create",
+                "operationId": "35b953dbef0b30427aea0a94814a5c12",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "refLocal"
+                                ],
+                                "properties": {
+                                    "refLocal": {
+                                        "type": "string",
+                                        "example": "ES-..."
+                                    },
+                                    "monto": {
+                                        "type": "number",
+                                        "example": 50000
+                                    },
+                                    "tipo": {
+                                        "type": "integer",
+                                        "example": 1
+                                    },
+                                    "fkUsuario": {
+                                        "type": "integer",
+                                        "example": 7
+                                    },
+                                    "fkClient": {
+                                        "type": "integer",
+                                        "example": 123
+                                    },
+                                    "nombreCliente": {
+                                        "type": "string",
+                                        "example": "Consumidor Final"
+                                    },
+                                    "descripcion": {
+                                        "type": "string",
+                                        "example": "Retiro para banco"
+                                    },
+                                    "facturasAfectadas": {
+                                        "type": "array",
+                                        "items": {}
+                                    },
+                                    "fecha": {
+                                        "type": "string",
+                                        "example": "2026-07-10 14:32:10"
+                                    },
+                                    "idServicio": {
+                                        "type": "integer",
+                                        "nullable": true
+                                    },
+                                    "metodoPago": {
+                                        "type": "array",
+                                        "items": {}
+                                    },
+                                    "datosServer": {
+                                        "description": "datos_server_json si ya sincronizo, o null",
+                                        "type": "object"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Guardado (upsert por refLocal)",
+                        "content": {
+                            "application/json": {
+                                "schema": {},
+                                "example": {
+                                    "ok": true
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Falta 'refLocal'"
+                    }
+                },
+                "security": [
+                    {
+                        "DolApiKey": []
+                    }
+                ]
+            }
+        },
+        "/api/api.php/integrospos/facturepos/cotizacion/item/eliminar": {
+            "post": {
+                "tags": [
+                    "Cotizacion"
+                ],
+                "summary": "Elimina una linea de la cotizacion",
+                "operationId": "347e1003fbc47772d90c7fd4f8c4f8b9",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "fk_product"
+                                ],
+                                "properties": {
+                                    "fk_facture": {
+                                        "description": "0 si se resuelve por ref_local",
+                                        "type": "integer",
+                                        "default": 0
+                                    },
+                                    "ref_local": {
+                                        "description": "Alternativa a fk_facture",
+                                        "type": "string"
+                                    },
+                                    "fk_product": {
+                                        "type": "integer"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Linea eliminada (idempotente: si la factura no se encuentra por ref_local, responde OK igual)",
+                        "content": {
+                            "application/json": {
+                                "schema": {},
+                                "example": {
+                                    "fk_facture": 9661,
+                                    "status": 1,
+                                    "message": "OK"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Falta 'fk_product', o no se indico 'fk_facture' ni 'ref_local'"
+                    }
+                },
+                "security": [
+                    {
+                        "DolApiKey": []
+                    }
+                ]
+            }
+        },
+        "/api/api.php/integrospos/facturepos/cotizacion/eliminar": {
+            "post": {
+                "tags": [
+                    "Cotizacion"
+                ],
+                "summary": "Elimina el borrador completo de una cotizacion",
+                "operationId": "15dfe31b5d723135966b2c749e65e357",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "id"
+                                ],
+                                "properties": {
+                                    "id": {
+                                        "description": "fk_facture del borrador",
+                                        "type": "integer",
+                                        "example": 9664
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Borrador eliminado. Solo funciona sobre borradores (fk_statut=0, ref (PROVxxx))",
+                        "content": {
+                            "application/json": {
+                                "schema": {},
+                                "example": {
+                                    "status": 1,
+                                    "message": "OK"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Falta 'id'"
+                    }
+                },
+                "security": [
+                    {
+                        "DolApiKey": []
+                    }
+                ]
+            }
+        },
+        "/api/api.php/integrospos/facturepos/facturesPerUser": {
+            "post": {
+                "tags": [
+                    "Facturacion"
+                ],
+                "summary": "Lista las facturas/tickets POS de un vendedor",
+                "operationId": "57a3fadf605572153136e4bff6310d60",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "byUser"
+                                ],
+                                "properties": {
+                                    "byUser": {
+                                        "description": "Id del usuario vendedor (fk_user_author)",
+                                        "type": "string",
+                                        "example": "5"
+                                    },
+                                    "producto": {
+                                        "description": "Filtra por label/descripcion/ref/codigo de barras del producto",
+                                        "type": "string",
+                                        "example": "Coca Cola"
+                                    },
+                                    "fk_caja_local": {
+                                        "description": "Filtra por referencia local del terminal de apertura/cierre",
+                                        "type": "string"
+                                    },
+                                    "cerrado": {
+                                        "description": "Si es true, solo facturas de terminales con estado=1 (cerrado)",
+                                        "type": "boolean"
+                                    },
+                                    "sortAD": {
+                                        "type": "string",
+                                        "default": "descending",
+                                        "enum": [
+                                            "ascending",
+                                            "descending"
+                                        ]
+                                    },
+                                    "sortField": {
+                                        "type": "string",
+                                        "default": "rowid",
+                                        "enum": [
+                                            "rowid",
+                                            "ref",
+                                            "datec",
+                                            "total_tva",
+                                            "total_ht",
+                                            "total_ttc",
+                                            "fk_soc"
+                                        ]
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Listado de facturas del vendedor (o rows=0 con mensaje si no hay resultados)",
+                        "content": {
+                            "application/json": {
+                                "schema": {},
+                                "example": {
+                                    "rows": 1,
+                                    "factures": [
+                                        {
+                                            "rowid": 120,
+                                            "ref": "(PROV120)",
+                                            "date_valid": "2026-07-01",
+                                            "total_iva": 1900,
+                                            "total_sin_iva": 10000,
+                                            "total_con_iva": 11900,
+                                            "type": "F",
+                                            "metodoPago": "[{\"idMetodo\":\"1\",\"valor\":11900}]",
+                                            "domicilio": false,
+                                            "domiDireccion": "",
+                                            "domiTelefono": "",
+                                            "domiBolsas": 0,
+                                            "domiObservaciones": "",
+                                            "domiTipo": 0,
+                                            "domiTipoDescripcion": "",
+                                            "esFactura": true,
+                                            "fk_soc": 3,
+                                            "nombreCliente": "Cliente generico(900123456)",
+                                            "fk_caja_local": "CAJA1",
+                                            "notaPrivada": "",
+                                            "genera_domicilio": false
+                                        }
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Falta 'byUser' o el parámetro de ordenamiento no es válido"
+                    }
+                }
+            }
+        },
+        "/api/api.php/integrospos/facturepos/detalleFactura": {
+            "post": {
+                "tags": [
+                    "Facturacion"
+                ],
+                "summary": "Detalle completo de una factura/ticket POS (items, impuestos, QR/CUFE, puntos)",
+                "operationId": "8c0148463d3f821bc55408026500b5b6",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "properties": {
+                                    "idFacture": {
+                                        "description": "Id (rowid) de la factura",
+                                        "type": "integer",
+                                        "example": 120
+                                    },
+                                    "ref": {
+                                        "description": "Referencia de la factura (busqueda parcial, LIKE %ref%)",
+                                        "type": "string",
+                                        "example": "(PROV120)"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Detalle de la factura",
+                        "content": {
+                            "application/json": {
+                                "schema": {},
+                                "example": {
+                                    "id": 120,
+                                    "numerFactura": "FACTURA DE VENTA #(PROV120)",
+                                    "refLocal": "",
+                                    "nombreCliente": "Cliente generico",
+                                    "documentoCliente": "900123456",
+                                    "fecha": "2026-07-01 10:00:00",
+                                    "cambio": 0,
+                                    "efectivo": 11900,
+                                    "totalPagado": 11900,
+                                    "subTotal": 10000,
+                                    "totalIva": 1900,
+                                    "metodoPago": [
+                                        {
+                                            "metodo": "Efectivo",
+                                            "valor": 11900
+                                        }
+                                    ],
+                                    "otrosImpuestos": 0,
+                                    "totalDescuento": 0,
+                                    "QR": "https://catalogo-vpfe.dian.gov.co/document/searchqr?documentkey=...",
+                                    "CUFE": "CUFE: e5bac48e354bc907bccff0ea7d45fbf784f0a8e7243b58337361e1fbd430489d",
+                                    "mensajeAlerta": "",
+                                    "resolucion": "Resolución de facturación electrónica número 18760000001 habilitada desde 1 hasta 5000000 - Fecha inicial 2024-01-01 - Fecha final 2027-01-01",
+                                    "puntosAcumulados": 0,
+                                    "puntosVenta": 0,
+                                    "puntosRedimidos": 0,
+                                    "puntosVencimiento": 0,
+                                    "fechaPuntosVencimiento": "2026-07-01",
+                                    "footerLegal": "",
+                                    "footerGratitud": "",
+                                    "footerIntegros": "Proveedor del software de facturación: Intégros 365 S.A.S. - Software propio",
+                                    "domiDireccion": "",
+                                    "domiTelefono": "",
+                                    "domiBolsas": 0,
+                                    "domiObservaciones": "",
+                                    "domiTipo": 0,
+                                    "domiTipoDescripcion": "",
+                                    "notaPrivada": "",
+                                    "items": [
+                                        {
+                                            "qty": 2,
+                                            "descuento": 0,
+                                            "total_iva": 1900,
+                                            "total_base": 10000,
+                                            "total_impuestos": 0,
+                                            "total": 11900,
+                                            "total_mas_impuesto": 11900,
+                                            "label": "Coca Cola 400ml",
+                                            "ref": "COCA400",
+                                            "lote": "",
+                                            "codigo_barras": "7702090001234",
+                                            "id_producto": 45,
+                                            "devolucion": 0
+                                        }
+                                    ],
+                                    "impuestos": [
+                                        {
+                                            "tipo": "iva",
+                                            "tarifa": 19,
+                                            "base": 10000,
+                                            "valor": 1900
+                                        }
+                                    ],
+                                    "facturaOriginal": ""
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Falta idFacture/ref, no existe la factura, la resolucion no es valida, o el usuario no tiene el permiso 'backend' de integrospos"
+                    }
+                },
+                "security": [
+                    {
+                        "DolApiKey": []
+                    }
+                ]
+            }
+        },
+        "/api/api.php/integrospos/pos/ticket/payment/": {
+            "post": {
+                "tags": [
+                    "Facturacion"
+                ],
+                "summary": "Crea un ticket/pedido POS completo (factura + lineas + pago + cierre) y genera sus asientos contables",
+                "operationId": "f28a2cdc1ad50ab88702e27b2b67ae9f",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "customerId",
+                                    "employeeId",
+                                    "cashId",
+                                    "tipo_fac",
+                                    "refLocal",
+                                    "lines"
+                                ],
+                                "properties": {
+                                    "cashId": {
+                                        "type": "integer"
+                                    },
+                                    "customerId": {
+                                        "type": "integer"
+                                    },
+                                    "employeeId": {
+                                        "type": "integer"
+                                    },
+                                    "notaPrivada": {
+                                        "type": "string"
+                                    },
+                                    "refLocal": {
+                                        "type": "string",
+                                        "example": "11-060726082457-0004"
+                                    },
+                                    "efectivo": {
+                                        "type": "number",
+                                        "default": 0
+                                    },
+                                    "regreso": {
+                                        "type": "number",
+                                        "default": 0
+                                    },
+                                    "direccionEntrega": {
+                                        "type": "string"
+                                    },
+                                    "telefonoEntrega": {
+                                        "type": "string"
+                                    },
+                                    "detalleEntrega": {
+                                        "type": "string"
+                                    },
+                                    "numeroBolsas": {
+                                        "type": "integer",
+                                        "default": 0
+                                    },
+                                    "fk_caja_local": {
+                                        "description": "Apertura de caja activa (opcional: el ticket tiene bypass from_app)",
+                                        "type": "string",
+                                        "example": "11-02072026074324-0008"
+                                    },
+                                    "tipo_fac": {
+                                        "description": "1=electronica, 2=pos, 3=borrador",
+                                        "type": "integer",
+                                        "enum": [
+                                            1,
+                                            2,
+                                            3
+                                        ]
+                                    },
+                                    "provisional": {
+                                        "type": "boolean",
+                                        "default": false
+                                    },
+                                    "lines": {
+                                        "type": "array",
+                                        "items": {
+                                            "properties": {
+                                                "idProduct": {
+                                                    "type": "integer"
+                                                },
+                                                "cant": {
+                                                    "type": "number"
+                                                },
+                                                "lote": {
+                                                    "type": "string"
+                                                },
+                                                "precio": {
+                                                    "type": "number"
+                                                },
+                                                "nivelPrecio": {
+                                                    "type": "string"
+                                                },
+                                                "descuento": {
+                                                    "type": "number"
+                                                },
+                                                "discount": {
+                                                    "type": "number"
+                                                },
+                                                "observaciones": {
+                                                    "type": "string"
+                                                },
+                                                "tva_tx": {
+                                                    "type": "number"
+                                                },
+                                                "fk_plantilla": {
+                                                    "type": "integer"
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "metodoPago": {
+                                        "type": "array",
+                                        "items": {
+                                            "properties": {
+                                                "idMetodo": {
+                                                    "type": "integer"
+                                                },
+                                                "valor": {
+                                                    "type": "number"
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Ticket creado, con el resultado de los asientos contables si la factura quedo valida",
+                        "content": {
+                            "application/json": {
+                                "schema": {},
+                                "example": {
+                                    "idFactura": 9662,
+                                    "ref": "(PROV9662)",
+                                    "total_ht": 30000,
+                                    "total_tva": 0,
+                                    "total_ttc": 30000,
+                                    "es_credito": 0,
+                                    "id_coupon_final": 0,
+                                    "status": 1,
+                                    "message": "OK",
+                                    "asientos_status": 1,
+                                    "asientos_message": "OK"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Falta 'customerId'/'employeeId'/'tipo_fac'/'refLocal'/'lines', o DOLAPIKEY invalida"
+                    }
+                },
+                "security": [
+                    {
+                        "DolApiKey": []
+                    }
+                ]
+            }
+        },
+        "/api/api.php/integrospos/facturepos/dian/actualizarTransaccion": {
+            "post": {
+                "tags": [
+                    "Facturacion"
+                ],
+                "summary": "Arma o actualiza el registro de transaccion DIAN (CUFE/QR/JSON) de una factura ya creada/validada/pagada",
+                "operationId": "774ae29d1e78ca353b71e83b853bf8a5",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "idFactura"
+                                ],
+                                "properties": {
+                                    "idFactura": {
+                                        "description": "Id (rowid) de la factura ya creada",
+                                        "type": "integer",
+                                        "example": 9662
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Resultado del SP sp_pos_dian_armar_json_factura (status=1 exito, status=2 fallo - la factura no se ve afectada)",
+                        "content": {
+                            "application/json": {
+                                "schema": {},
+                                "example": {
+                                    "status": 1,
+                                    "message": "OK",
+                                    "cufe": "e5bac48e354bc907bccff0ea7d45fbf784f0a8e7243b58337361e1fbd430489d",
+                                    "qr": "https://catalogo-vpfe.dian.gov.co/document/searchqr?documentkey=..."
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Falta 'idFactura' o no es un id valido"
+                    }
+                },
+                "security": [
+                    {
+                        "DolApiKey": []
+                    }
+                ]
+            }
+        },
+        "/api/api.php/integrospos/pos/backup/pedido": {
+            "post": {
+                "tags": [
+                    "Backup"
+                ],
+                "summary": "Respaldo/bitacora de un pedido confirmado en el POS offline (Flutter) - llamada adicional, en paralelo al sync de negocio de pos/ticket/payment",
+                "operationId": "341643ed76a13e2a21d81195f8d7e5b8",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "refLocal"
+                                ],
+                                "properties": {
+                                    "refLocal": {
+                                        "type": "string",
+                                        "example": "LOCAL-1720612345678"
+                                    },
+                                    "numeroServidor": {
+                                        "type": "string",
+                                        "example": "PROV1234"
+                                    },
+                                    "fechaConfirmacion": {
+                                        "type": "string",
+                                        "example": "2026-07-10 14:32:10"
+                                    },
+                                    "tipoFactura": {
+                                        "type": "integer",
+                                        "example": 3
+                                    },
+                                    "cotizacion": {
+                                        "type": "boolean"
+                                    },
+                                    "sincronizadoConErp": {
+                                        "type": "boolean"
+                                    },
+                                    "datosPedido": {
+                                        "description": "Contenido integro de datos_json (PedidoConfirmado serializado)",
+                                        "type": "object"
+                                    },
+                                    "pedidoRequest": {
+                                        "description": "Contenido integro de pedido_request_json (mismo body enviado a ticket/payment)",
+                                        "type": "object"
+                                    },
+                                    "datosServer": {
+                                        "description": "Contenido de datos_server_json si ya sincronizo, o null",
+                                        "type": "object"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Guardado (upsert por refLocal)",
+                        "content": {
+                            "application/json": {
+                                "schema": {},
+                                "example": {
+                                    "ok": true
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Falta 'refLocal'"
+                    }
+                },
+                "security": [
+                    {
+                        "DolApiKey": []
+                    }
+                ]
+            }
+        },
+        "/api/api.php/integrospos/facturepos/cancelarfactura": {
+            "post": {
+                "tags": [
+                    "NotaCredito"
+                ],
+                "summary": "Crea una nota credito, manual o a partir de una factura existente (devolucion/anulacion)",
+                "operationId": "8e16661a9e94bcc2d2f0c83082fef9e4",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "refLocal",
+                                    "fk_bank_terminal"
+                                ],
+                                "properties": {
+                                    "idFacture": {
+                                        "description": "Factura origen (con esto o \"referencia\" es devolucion/anulacion; sin ninguno es nota credito manual)",
+                                        "type": "integer"
+                                    },
+                                    "referencia": {
+                                        "description": "Alternativa a idFacture, busqueda LIKE",
+                                        "type": "string"
+                                    },
+                                    "customerId": {
+                                        "description": "Obligatorio solo sin factura origen",
+                                        "type": "integer"
+                                    },
+                                    "tipo_fac": {
+                                        "description": "Obligatorio solo sin factura origen",
+                                        "type": "integer",
+                                        "enum": [
+                                            1,
+                                            2,
+                                            3
+                                        ]
+                                    },
+                                    "refLocal": {
+                                        "type": "string"
+                                    },
+                                    "fk_caja_local": {
+                                        "description": "Apertura activa; obligatoria solo sin factura origen",
+                                        "type": "string"
+                                    },
+                                    "fk_bank_terminal": {
+                                        "description": "Caja fija del terminal (c_paiement resuelto por el llamador)",
+                                        "type": "integer"
+                                    },
+                                    "idwarehouse": {
+                                        "description": "0 = no revertir stock",
+                                        "type": "integer",
+                                        "default": 0
+                                    },
+                                    "notaPrivada": {
+                                        "description": "Se ignora si hay factura origen",
+                                        "type": "string"
+                                    },
+                                    "lines": {
+                                        "description": "Sin factura origen: obligatorio. Con factura origen: NULL/omitido devuelve todas las lineas originales",
+                                        "type": "array",
+                                        "items": {
+                                            "properties": {
+                                                "idProduct": {
+                                                    "type": "integer"
+                                                },
+                                                "cant": {
+                                                    "type": "number"
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "metodoPago": {
+                                        "description": "idMetodo es un c_paiement.id directo (no bank_account.rowid)",
+                                        "type": "array",
+                                        "items": {
+                                            "properties": {
+                                                "idMetodo": {
+                                                    "type": "integer"
+                                                },
+                                                "valor": {
+                                                    "type": "number"
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Nota credito creada",
+                        "content": {
+                            "application/json": {
+                                "schema": {},
+                                "example": {
+                                    "id_factura": 9720,
+                                    "ref": "(PROV9720)",
+                                    "status": 1,
+                                    "message": "OK"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Falta 'refLocal'/'fk_bank_terminal', o 'customerId'/'tipo_fac'/'fk_caja_local'/'lines' cuando no hay factura origen"
+                    },
+                    "400": {
+                        "description": "El SP rechazo la operacion (status != 1): producto no encontrado, cantidad excedida, etc."
+                    }
+                },
+                "security": [
+                    {
+                        "DolApiKey": []
+                    }
+                ]
+            }
+        },
+        "/api/api.php/integrospos/pos/backup/notaCredito": {
+            "post": {
+                "tags": [
+                    "Backup"
+                ],
+                "summary": "Respaldo/bitacora de una nota credito confirmada en el POS offline (Flutter) - llamada adicional, en paralelo al sync de negocio de facturepos/cancelarfactura",
+                "operationId": "7d13ed0f2b39ca86e0b2e0773bad4c46",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "refLocal"
+                                ],
+                                "properties": {
+                                    "refLocal": {
+                                        "type": "string",
+                                        "example": "12-NC-10072026143210-45"
+                                    },
+                                    "numeroServidor": {
+                                        "type": "string",
+                                        "example": "NC-9876"
+                                    },
+                                    "fecha": {
+                                        "type": "string",
+                                        "example": "2026-07-10 14:32:10"
+                                    },
+                                    "clienteNombre": {
+                                        "type": "string",
+                                        "example": "Juan Pérez"
+                                    },
+                                    "totalConIva": {
+                                        "type": "number",
+                                        "example": 45000
+                                    },
+                                    "payload": {
+                                        "description": "Contenido integro de payload_json (mismo body enviado a cancelarfactura)",
+                                        "type": "object"
+                                    },
+                                    "datosServer": {
+                                        "description": "datos_server_json si ya sincronizo, o null",
+                                        "type": "object"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Guardado (upsert por refLocal)",
+                        "content": {
+                            "application/json": {
+                                "schema": {},
+                                "example": {
+                                    "ok": true
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Falta 'refLocal'"
+                    }
+                },
+                "security": [
+                    {
+                        "DolApiKey": []
+                    }
+                ]
+            }
+        },
+        "/api/api.php/integrospos/imagepath/getImagePath": {
+            "get": {
+                "tags": [
+                    "Imagenes"
+                ],
+                "summary": "Sirve directamente la imagen configurada (logo, fondo de login o encabezado de tirilla)",
+                "operationId": "0f6e98cf179aea4cca65ff8ab6a7b055",
+                "parameters": [
+                    {
+                        "name": "tipo",
+                        "in": "query",
+                        "description": "1 = Logo de la empresa, 2 = Imagen de fondo del login, 3 = Imagen para encabezado de tirilla impresa",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "enum": [
+                                1,
+                                2,
+                                3
+                            ]
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Contenido binario de la imagen (Content-Type según el archivo)"
+                    },
+                    "400": {
+                        "description": "Parámetro \"tipo\" no especificado o inválido"
+                    },
+                    "404": {
+                        "description": "Archivo no configurado para ese tipo, o no encontrado en disco"
+                    }
+                }
+            }
+        },
+        "/api/api.php/integrospos/productopos/searchProducto": {
+            "post": {
+                "tags": [
+                    "Productos"
+                ],
+                "summary": "Busca productos para el POS, con precios por nivel de cliente, impuestos extra y promociones aplicadas",
+                "operationId": "6a9d0368ffc6cb479745a31495cb8f02",
+                "requestBody": {
+                    "required": false,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "properties": {
+                                    "byRefODesc": {
+                                        "description": "Filtra por ref o label del producto (LIKE)",
+                                        "type": "string",
+                                        "example": "Coca Cola"
+                                    },
+                                    "byCodigoBarras": {
+                                        "description": "Busca por ref exacta o codigo de barras exacto",
+                                        "type": "string"
+                                    },
+                                    "puntos": {
+                                        "description": "Si es 1, solo productos redimibles por puntos y el precio devuelto es en puntos",
+                                        "type": "integer",
+                                        "enum": [
+                                            0,
+                                            1
+                                        ]
+                                    },
+                                    "clienteId": {
+                                        "description": "Id del cliente (societe), usado para resolver su nivel de precio y promociones aplicables",
+                                        "type": "integer",
+                                        "example": 3
+                                    },
+                                    "ventaSinStock": {
+                                        "description": "Si es true, incluye productos sin stock (por defecto solo se listan con stock>0 o tipo servicio)",
+                                        "type": "boolean"
+                                    },
+                                    "limit": {
+                                        "description": "Limite de resultados",
+                                        "type": "integer"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Listado de productos (vacio si no hay match, o si byCodigoBarras encuentra mas de 1 coincidencia)",
+                        "content": {
+                            "application/json": {
+                                "schema": {},
+                                "example": [
+                                    {
+                                        "rowid": 45,
+                                        "ref": "COCA400",
+                                        "label": "Coca Cola 400ml",
+                                        "description": "Bebida gaseosa",
+                                        "precio": 2500,
+                                        "iva": 475,
+                                        "porcentajeIva": 19,
+                                        "impuestos": 0,
+                                        "precio_total": 3000,
+                                        "precio_total_sin_promo": 3000,
+                                        "precio_minimo": 2500,
+                                        "descuento": 0,
+                                        "cantidad_descuento": 0,
+                                        "urlImagen": "https://miapp.com/viewimage.php?modulepart=product&file=/45/coca400.jpg&publictakepos=1",
+                                        "ventaGramos": false,
+                                        "stock": [
+                                            {
+                                                "idAlmacen": 1,
+                                                "cantidad": 80
+                                            },
+                                            {
+                                                "idAlmacen": 2,
+                                                "cantidad": 40
+                                            }
+                                        ],
+                                        "codigo_barras": "7702090001234",
+                                        "lotes": [],
+                                        "ventaPrecio": false,
+                                        "ventaCantidad": false,
+                                        "impuestosExtras": [],
+                                        "nivelesPrecios": [],
+                                        "obsequio": [],
+                                        "descuentoGlobal": 0,
+                                        "tipoProducto": 0,
+                                        "packs": [],
+                                        "fk_plantilla": 0,
+                                        "idcategorias": [
+                                            12
+                                        ],
+                                        "precio_compra": 1800,
+                                        "proveedor": {
+                                            "id": 0,
+                                            "nombre": ""
+                                        }
+                                    }
+                                ]
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/api.php/integrospos/products/getProductosByPromo/{idPromo}": {
+            "post": {
+                "tags": [
+                    "Productos"
+                ],
+                "summary": "Productos de una promocion en formato POS completo (precios, stock, lotes, descuentos)",
+                "operationId": "decebd3b0c1f375946d9f4bcf6f947b4",
+                "parameters": [
+                    {
+                        "name": "idPromo",
+                        "in": "path",
+                        "description": "Id de la promocion",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "example": 12
+                    }
+                ],
+                "requestBody": {
+                    "required": false,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "properties": {
+                                    "clienteId": {
+                                        "description": "Id del cliente, para resolver su nivel de precios",
+                                        "type": "integer",
+                                        "example": 3
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Productos de la promocion y los clientes a los que aplica",
+                        "content": {
+                            "application/json": {
+                                "schema": {},
+                                "example": {
+                                    "productos": [
+                                        {
+                                            "rowid": 45,
+                                            "ref": "COCA400",
+                                            "label": "Coca Cola 400ml",
+                                            "description": "Bebida gaseosa",
+                                            "precio": 2500,
+                                            "iva": 475,
+                                            "porcentajeIva": 19,
+                                            "impuestos": 0,
+                                            "precio_total": 3000,
+                                            "precio_total_sin_promo": 3000,
+                                            "precio_minimo": 2500,
+                                            "descuento": 0,
+                                            "cantidad_descuento": 0,
+                                            "urlImagen": "",
+                                            "ventaGramos": false,
+                                            "stock": 120,
+                                            "codigo_barras": "7702090001234",
+                                            "lotes": [],
+                                            "ventaPrecio": false,
+                                            "ventaCantidad": false,
+                                            "impuestosExtras": [],
+                                            "nivelesPrecios": [],
+                                            "obsequio": [],
+                                            "descuentoGlobal": 0,
+                                            "tipoProducto": 0,
+                                            "packs": []
+                                        }
+                                    ],
+                                    "clientes_promocion": {
+                                        "promocion": 12,
+                                        "clientes": [
+                                            3,
+                                            8
+                                        ]
+                                    },
+                                    "totalEncontrados": 1,
+                                    "totalNoEncontrados": 0,
+                                    "idsNoEncontrados": []
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "El usuario no tiene el permiso 'backend' de integrospos"
+                    }
+                },
+                "security": [
+                    {
+                        "DolApiKey": []
+                    }
+                ]
+            }
+        },
+        "/api/api.php/integrospos/products/postCreateProduct": {
+            "post": {
+                "tags": [
+                    "Productos"
+                ],
+                "summary": "Crea o edita un producto del POS: si el payload trae idProducto lo edita, si no lo trae crea uno nuevo",
+                "operationId": "4e6f69236de5324c65933797ddf93b28",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "properties": {
+                                    "ref": {
+                                        "description": "Referencia; al crear debe ser unica",
+                                        "type": "string",
+                                        "example": "COCA400"
+                                    },
+                                    "etiqueta": {
+                                        "description": "Nombre/label del producto",
+                                        "type": "string",
+                                        "example": "Coca Cola 400ml"
+                                    },
+                                    "descripcion": {
+                                        "type": "string",
+                                        "example": "Bebida gaseosa"
+                                    },
+                                    "estadoVenta": {
+                                        "type": "integer",
+                                        "enum": [
+                                            0,
+                                            1
+                                        ]
+                                    },
+                                    "estadoCompra": {
+                                        "type": "integer",
+                                        "enum": [
+                                            0,
+                                            1
+                                        ]
+                                    },
+                                    "precioConIva": {
+                                        "type": "number",
+                                        "example": 3000
+                                    },
+                                    "precioMin": {
+                                        "type": "number",
+                                        "example": 2800
+                                    },
+                                    "iva": {
+                                        "description": "Tasa de IVA",
+                                        "type": "number",
+                                        "example": 19
+                                    },
+                                    "codigoBarras": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "string"
+                                        },
+                                        "example": [
+                                            "7702090001234"
+                                        ]
+                                    },
+                                    "stock": {
+                                        "description": "Solo se usa al crear",
+                                        "type": "number",
+                                        "example": 100
+                                    },
+                                    "lote": {
+                                        "description": "Solo se usa al crear, junto con stock",
+                                        "type": "string"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Producto creado o editado",
+                        "content": {
+                            "application/json": {
+                                "schema": {},
+                                "example": {
+                                    "status": 1,
+                                    "msg": "Producto agregado correctamente",
+                                    "idProduct": 45
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Falta DOLAPIKEY, faltan campos obligatorios, la referencia/codigo de barras ya existen, el idProducto no existe, o la terminal no tiene permiso para crear/editar precios"
+                    }
+                },
+                "security": [
+                    {
+                        "DolApiKey": []
+                    }
+                ]
+            }
+        },
+        "/api/api.php/integrospos/sorteos/getSorteos": {
+            "post": {
+                "tags": [
+                    "Sorteos"
+                ],
+                "summary": "Listado paginado de sorteos (grilla estilo Syncfusion DataManager)",
+                "operationId": "0ed8e0aebe2478371f855f1421461354",
+                "requestBody": {
+                    "required": false,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "properties": {
+                                    "skip": {
+                                        "type": "integer",
+                                        "example": 0
+                                    },
+                                    "take": {
+                                        "type": "integer",
+                                        "example": 50
+                                    },
+                                    "sorted": {
+                                        "type": "array",
+                                        "items": {
+                                            "properties": {
+                                                "name": {
+                                                    "type": "string",
+                                                    "example": "fecha_inicio"
+                                                },
+                                                "direction": {
+                                                    "type": "string",
+                                                    "enum": [
+                                                        "ascending",
+                                                        "descending"
+                                                    ]
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "where": {
+                                        "description": "Predicados estilo Syncfusion DataManager (field/operator/value, agrupables con isComplex+predicates)",
+                                        "type": "array",
+                                        "items": {
+                                            "properties": {
+                                                "field": {
+                                                    "type": "string",
+                                                    "example": "descripcion"
+                                                },
+                                                "operator": {
+                                                    "type": "string",
+                                                    "enum": [
+                                                        "startswith",
+                                                        "endswith",
+                                                        "contains",
+                                                        "equal",
+                                                        "notequal",
+                                                        "greaterthan",
+                                                        "greaterthanorequal",
+                                                        "lessthan",
+                                                        "lessthanorequal"
+                                                    ]
+                                                },
+                                                "value": {
+                                                    "type": "string",
+                                                    "example": "Navidad"
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "fecha_desde": {
+                                        "description": "Filtra fecha_inicio >= valor",
+                                        "type": "string",
+                                        "format": "date"
+                                    },
+                                    "fecha_hasta": {
+                                        "description": "Filtra fecha_inicio <= valor",
+                                        "type": "string",
+                                        "format": "date"
+                                    },
+                                    "fecha_final_desde": {
+                                        "description": "Filtra fecha_final >= valor",
+                                        "type": "string",
+                                        "format": "date"
+                                    },
+                                    "fecha_final_hasta": {
+                                        "description": "Filtra fecha_final <= valor",
+                                        "type": "string",
+                                        "format": "date"
+                                    },
+                                    "estado_filtro": {
+                                        "description": "'' = todos, '1' = activos, '0' = inactivos",
+                                        "type": "string",
+                                        "enum": [
+                                            "",
+                                            "1",
+                                            "0"
+                                        ]
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Filas paginadas y el total de registros que cumplen los filtros",
+                        "content": {
+                            "application/json": {
+                                "schema": {},
+                                "example": {
+                                    "rowData": [
+                                        {
+                                            "rowid": 1,
+                                            "descripcion": "Sorteo Navidad",
+                                            "premio": "Televisor 50 pulgadas",
+                                            "fecha_inicio": "01/12/2026",
+                                            "fecha_final": "24/12/2026",
+                                            "fecha_inicio_raw": "2026-12-01",
+                                            "fecha_final_raw": "2026-12-24",
+                                            "compra_minimo": 50000,
+                                            "valor_participacion": 1,
+                                            "tipo_cliente": 0,
+                                            "tipo_calculo": 0,
+                                            "estado": 1,
+                                            "permitir_entregar_sin_ctrl": 0,
+                                            "observacion": "",
+                                            "fk_clientes": null,
+                                            "fk_productos": null,
+                                            "fk_ganador": null
+                                        }
+                                    ],
+                                    "count": 1
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/api.php/integrospos/sorteos/insertarBoletosDirecto": {
+            "post": {
+                "tags": [
+                    "Sorteos"
+                ],
+                "summary": "Inserta boletos de participación de sorteo directo (sin pasar por la venta POS)",
+                "operationId": "c60fe748ac14dc59b7b28977251ed908",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "properties": {
+                                    "boletos": {
+                                        "type": "array",
+                                        "items": {
+                                            "properties": {
+                                                "fk_sorteo": {
+                                                    "description": "Sorteo al que pertenece el boleto (obligatorio)",
+                                                    "type": "integer",
+                                                    "example": 1
+                                                },
+                                                "codigo": {
+                                                    "description": "Código único del boleto (obligatorio)",
+                                                    "type": "string",
+                                                    "example": "ABC123"
+                                                },
+                                                "fk_cliente": {
+                                                    "description": "Cliente asociado",
+                                                    "type": "integer"
+                                                },
+                                                "fk_factura": {
+                                                    "description": "Factura asociada",
+                                                    "type": "integer"
+                                                },
+                                                "ref_factura": {
+                                                    "type": "string",
+                                                    "example": "FAC-0001"
+                                                },
+                                                "fk_vendedor": {
+                                                    "description": "Vendedor asociado",
+                                                    "type": "integer"
+                                                },
+                                                "valor_compra": {
+                                                    "type": "integer",
+                                                    "example": 50000
+                                                },
+                                                "numero_boleto": {
+                                                    "type": "integer",
+                                                    "example": 1
+                                                },
+                                                "codigo_seguridad": {
+                                                    "type": "string",
+                                                    "example": "1234"
+                                                },
+                                                "estado": {
+                                                    "type": "integer",
+                                                    "example": 0,
+                                                    "enum": [
+                                                        0,
+                                                        1,
+                                                        2,
+                                                        3
+                                                    ]
+                                                },
+                                                "fecha_registro": {
+                                                    "description": "Por defecto la fecha actual",
+                                                    "type": "string",
+                                                    "format": "date"
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Boletos insertados correctamente, o error de validación de campos obligatorios (status=1)",
+                        "content": {
+                            "application/json": {
+                                "schema": {},
+                                "example": {
+                                    "status": 0,
+                                    "message": "Se insertaron 1 boleto(s) correctamente",
+                                    "boletos": [
+                                        {
+                                            "rowid": 10,
+                                            "fk_sorteo": 1,
+                                            "numero_boleto": 1,
+                                            "codigo": "ABC123",
+                                            "estado": 0
+                                        }
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Códigos duplicados dentro del payload o ya existentes en la base de datos"
+                    }
+                }
+            }
+        },
+        "/api/api.php/integrospos/tickettemplate/{id}": {
+            "post": {
+                "tags": [
+                    "TicketTemplate"
+                ],
+                "summary": "Obtiene una plantilla de tirilla por rowid o por nombre (o todas si id=0/null)",
+                "operationId": "538cae7fbfeb1a821d04fa69f62ebc98",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "Rowid numerico, nombre de la plantilla, o '0'/'null' para traerlas todas",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        },
+                        "example": "0"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Una plantilla (objeto) o todas las plantillas (array), segun el id enviado",
+                        "content": {
+                            "application/json": {
+                                "schema": {},
+                                "example": {
+                                    "rowid": 1,
+                                    "nombre": "venta",
+                                    "label": "Venta / Factura",
+                                    "config": [],
+                                    "activo": 1
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "ID/nombre invalido o plantilla no encontrada"
+                    }
+                }
+            }
+        },
+        "/api/api.php/integrospos/tickettemplate/tipos": {
+            "post": {
+                "tags": [
+                    "TicketTemplate"
+                ],
+                "summary": "Lista todos los tipos de ticket disponibles",
+                "operationId": "fcbfca8b12ff441f7c777df601dc185a",
+                "responses": {
+                    "200": {
+                        "description": "Listado de tipos de ticket",
+                        "content": {
+                            "application/json": {
+                                "schema": {},
+                                "example": {
+                                    "tipos": [
+                                        {
+                                            "rowid": 1,
+                                            "nombre": "venta",
+                                            "label": "Venta / Factura",
+                                            "activo": 1
+                                        },
+                                        {
+                                            "rowid": 2,
+                                            "nombre": "nota_credito",
+                                            "label": "Nota Crédito",
+                                            "activo": 1
+                                        }
+                                    ]
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/api.php/integrospos/tickettemplate/get": {
+            "post": {
+                "tags": [
+                    "TicketTemplate"
+                ],
+                "summary": "Obtiene la configuracion completa de un tipo de ticket por nombre",
+                "operationId": "f1b1d522553be63b8d5ff50bee9612be",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "nombre"
+                                ],
+                                "properties": {
+                                    "nombre": {
+                                        "type": "string",
+                                        "example": "venta"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Configuracion del tipo de ticket",
+                        "content": {
+                            "application/json": {
+                                "schema": {},
+                                "example": {
+                                    "rowid": 1,
+                                    "nombre": "venta",
+                                    "label": "Venta / Factura",
+                                    "config": [],
+                                    "dato_preview": [],
+                                    "columnas": 80,
+                                    "variables": []
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Falta 'nombre' o el tipo no fue encontrado"
+                    }
+                }
+            }
+        },
+        "/api/api.php/integrospos/tickettemplate/variables": {
+            "post": {
+                "tags": [
+                    "TicketTemplate"
+                ],
+                "summary": "Lista todas las variables globales de campo para tirillas",
+                "operationId": "f06b9015ebb39b693813abe6fc4ed2dc",
+                "responses": {
+                    "200": {
+                        "description": "Listado de variables",
+                        "content": {
+                            "application/json": {
+                                "schema": {},
+                                "example": {
+                                    "variables": [
+                                        {
+                                            "rowid": 1,
+                                            "nombre": "empresa",
+                                            "descripcion": "Nombre de la empresa",
+                                            "tipo": "string"
+                                        }
+                                    ]
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/api.php/integrospos/tickettemplate/secciones": {
+            "post": {
+                "tags": [
+                    "TicketTemplate"
+                ],
+                "summary": "Lista todas las secciones reutilizables de tirillas",
+                "operationId": "8aadd5e98716b2f1e49ad781b130b647",
+                "responses": {
+                    "200": {
+                        "description": "Listado de secciones",
+                        "content": {
+                            "application/json": {
+                                "schema": {},
+                                "example": {
+                                    "secciones": [
+                                        {
+                                            "rowid": 1,
+                                            "nombre": "encabezado",
+                                            "descripcion": "Encabezado con logo y datos de la empresa",
+                                            "elementos": [],
+                                            "condicional": null,
+                                            "repeat": null
+                                        }
+                                    ]
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/api.php/integrospos/logs/registrarErrorEndpoint": {
+            "post": {
+                "tags": [
+                    "Usuarios"
+                ],
+                "summary": "Registra un error de API (status >= 400) reportado por el POS (LoggingClient)",
+                "operationId": "a17e388fec284aa50976eff4c4491b62",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "metodo",
+                                    "url",
+                                    "status_code",
+                                    "fecha"
+                                ],
+                                "properties": {
+                                    "deviceid": {
+                                        "description": "HOSTNAME_IP de la terminal",
+                                        "type": "string",
+                                        "example": "DESKTOP-CAJA01_192.168.1.50"
+                                    },
+                                    "fk_user": {
+                                        "description": "Usuario logueado en el POS (puede venir null si no hay sesion)",
+                                        "type": "integer",
+                                        "example": 42,
+                                        "nullable": true
+                                    },
+                                    "metodo": {
+                                        "type": "string",
+                                        "example": "POST"
+                                    },
+                                    "url": {
+                                        "type": "string",
+                                        "example": "https://miserver.com/api.php/integrospos/pos/ticket/payment"
+                                    },
+                                    "status_code": {
+                                        "description": "Siempre >= 400",
+                                        "type": "integer",
+                                        "example": 500
+                                    },
+                                    "tiempo_ms": {
+                                        "type": "integer",
+                                        "example": 842
+                                    },
+                                    "request_body": {
+                                        "description": "Body enviado por el POS (JSON como texto)",
+                                        "type": "string"
+                                    },
+                                    "response_body": {
+                                        "description": "Body devuelto por el servidor (JSON como texto)",
+                                        "type": "string"
+                                    },
+                                    "fecha": {
+                                        "description": "Fecha/hora local del POS, ISO-8601",
+                                        "type": "string",
+                                        "example": "2026-07-08T12:34:56.000"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Error registrado. El POS solo revisa el status HTTP (200/201 = sincronizado, cualquier otro = reintenta despues)"
+                    },
+                    "401": {
+                        "description": "Falta 'metodo'/'url'/'fecha', o 'status_code' invalido (< 400)"
+                    }
+                },
+                "security": [
+                    {
+                        "DolApiKey": []
+                    }
+                ]
+            }
+        },
+        "/api/api.php/integrospos/user/getUsersPos": {
+            "post": {
+                "tags": [
+                    "Usuarios"
+                ],
+                "summary": "Lista los usuarios POS activos con sus permisos de integrospos",
+                "operationId": "654de65d5fbfe1382c334b618ad4e92e",
+                "responses": {
+                    "200": {
+                        "description": "Listado de usuarios activos",
+                        "content": {
+                            "application/json": {
+                                "schema": {},
+                                "example": [
+                                    {
+                                        "rowid": 1,
+                                        "login": "a.ardila",
+                                        "pass_crypted": "$2y$10$...",
+                                        "api_key": "dolcrypt:AES-256-CTR:10fbb3f05469219f:...",
+                                        "pin_admin": 0,
+                                        "admin": false,
+                                        "fullname": "Andres Ardila",
+                                        "permisos": {
+                                            "pinCajon": false,
+                                            "pinRimprimir": false,
+                                            "pinDevoluciones": false,
+                                            "pinSumarRestar": false,
+                                            "pinEliminar": false,
+                                            "pedidosProvisionales": false,
+                                            "aplicaDevoluciones": true,
+                                            "nivelPrecioPinUsuario": false,
+                                            "devoluciones": true,
+                                            "entradasSalidas": false
+                                        }
+                                    }
+                                ]
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/api.php/integrospos/pos/autorizacion": {
+            "post": {
+                "tags": [
+                    "Usuarios"
+                ],
+                "summary": "Valida un PIN de administrador y devuelve a que usuario pertenece",
+                "operationId": "570823a0795123717c902678eccabbb8",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "pin"
+                                ],
+                                "properties": {
+                                    "pin": {
+                                        "description": "Pin a validar (user_extrafields.pin_admin)",
+                                        "type": "string",
+                                        "example": "1234"
+                                    },
+                                    "user": {
+                                        "description": "Id del usuario actualmente en sesion en el POS, para saber si el pin es de el mismo",
+                                        "type": "integer",
+                                        "example": 5
+                                    },
+                                    "bandera": {
+                                        "description": "Si se envia (cualquier valor), un pin no encontrado responde 200 con status=1 en vez de un 401",
+                                        "example": true
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Resultado de la validacion: 'Pin valido', 'Pin valido para este usuario', o (solo si se envio 'bandera') 'Pin no encontrado'",
+                        "content": {
+                            "application/json": {
+                                "schema": {},
+                                "example": {
+                                    "message": "Pin valido",
+                                    "nombre": "Andres Ardila",
+                                    "status": 0
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Falta DOLAPIKEY, el usuario no tiene el permiso 'backend' de integrospos, o el pin no existe (y no se envio 'bandera')"
+                    }
+                },
+                "security": [
+                    {
+                        "DolApiKey": []
+                    }
+                ]
+            }
+        },
+        "/api/custom/integrospos/validateApiKey": {
+            "post": {
+                "tags": [
+                    "Usuarios"
+                ],
+                "summary": "Valida una APIKEY de Dolibarr (endpoint publico; la APIKEY va en el header DOLAPIKEY, no en el body)",
+                "operationId": "98001aef8013064e47f0a8c2ad1b5724",
+                "responses": {
+                    "200": {
+                        "description": "Siempre 200 (nunca aborta); 'ok' indica si la APIKEY es valida",
+                        "content": {
+                            "application/json": {
+                                "schema": {},
+                                "example": {
+                                    "ok": true,
+                                    "user": {
+                                        "id": 5,
+                                        "login": "a.ardila",
+                                        "nombre": "Andres Ardila",
+                                        "admin": 1
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "DolApiKey": []
+                    }
+                ]
+            }
+        }
+    },
+    "components": {
+        "securitySchemes": {
+            "DolApiKey": {
+                "type": "apiKey",
+                "description": "Token de API del usuario, tal como aparece en su ficha de usuario en Dolibarr (campo 'Clave API').",
+                "name": "DOLAPIKEY",
+                "in": "header"
+            },
+            "SanctumToken": {
+                "type": "http",
+                "description": "Access token obtenido en POST /custom/integrospos/login.php (campo 'access_token' de la respuesta). Se envia como header 'Authorization: Bearer <access_token>'.",
+                "bearerFormat": "access_token",
+                "scheme": "bearer"
+            }
+        }
+    },
+    "tags": [
+        {
+            "name": "CashControl",
+            "description": "CashControl"
+        },
+        {
+            "name": "Auth",
+            "description": "Auth"
+        },
+        {
+            "name": "Clientes",
+            "description": "Clientes"
+        },
+        {
+            "name": "Configuracion",
+            "description": "Configuracion"
+        },
+        {
+            "name": "Domicilio",
+            "description": "Domicilio"
+        },
+        {
+            "name": "Entradasalidas",
+            "description": "Entradasalidas"
+        },
+        {
+            "name": "Backup",
+            "description": "Backup"
+        },
+        {
+            "name": "Cotizacion",
+            "description": "Cotizacion"
+        },
+        {
+            "name": "Facturacion",
+            "description": "Facturacion"
+        },
+        {
+            "name": "NotaCredito",
+            "description": "NotaCredito"
+        },
+        {
+            "name": "Imagenes",
+            "description": "Imagenes"
+        },
+        {
+            "name": "Productos",
+            "description": "Productos"
+        },
+        {
+            "name": "Sorteos",
+            "description": "Sorteos"
+        },
+        {
+            "name": "TicketTemplate",
+            "description": "TicketTemplate"
+        },
+        {
+            "name": "Usuarios",
+            "description": "Usuarios"
+        }
+    ]
+}
