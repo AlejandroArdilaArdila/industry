@@ -102,6 +102,8 @@ class ConfiguracionController extends Controller
         $d = $request->validate([
             'productos' => ['nullable', 'string', 'max:6000'],
             'correo' => ['nullable', 'string', 'max:6000'],
+            'asistente' => ['nullable', 'string', 'max:6000'],
+            'localizacion' => ['nullable', 'string', 'max:6000'],
         ]);
         $servicio = app(SolicitudPromptsService::class);
         $servicio->guardar($d);

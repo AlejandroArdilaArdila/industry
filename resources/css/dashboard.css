@@ -311,6 +311,16 @@
 .pr-meta .dash-btn { align-self: flex-end; }
 
 .pr-click { cursor: pointer; }
+/* Etapa donde estamos (barra de otras pantallas): bolita con halo, rótulo y chip «Estás aquí». */
+.pr-paso.actual { padding-bottom: 6px; border-radius: 12px; background: color-mix(in oklab, var(--m, var(--c)) 9%, transparent); }
+.pr-paso.actual .pr-ico { box-shadow: 0 0 0 4px color-mix(in oklab, var(--m, var(--c)) 28%, transparent), 0 8px 16px -8px var(--m, var(--c)); }
+.pr-paso.actual b { color: var(--m, var(--foreground)); }
+.pr-aqui { display: inline-flex; align-items: center; gap: 4px; margin-top: 2px; padding: 1px 8px; border-radius: 999px; background: var(--m, var(--primary)); color: var(--mt, #fff); font-size: 10px; font-weight: 800; letter-spacing: 0.02em; }
+/* Barra a todo el ancho, fuera de la card; el relleno de la línea deja sitio al halo del paso actual para que no se recorte. */
+.pr-barra { margin: 0; padding: 6px 16px; border: 0; border-bottom: 1px solid var(--border); border-radius: 0; box-shadow: none; background: var(--background); }
+.pr-barra .pr-linea { padding: 10px 4px 8px; }
+.pr-barra .pr-paso { padding-top: 6px; }
+.pr-barra .pr-paso::before { top: 25px; }
 .pr-click:hover b { text-decoration: underline; }
 
 /* Pestañas Solicitud / Seguimiento del panel de actividades */

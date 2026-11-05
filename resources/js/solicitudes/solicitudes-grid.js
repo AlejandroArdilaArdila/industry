@@ -14,19 +14,23 @@ import {
 import { ActividadFichaModal } from '../panel/actividades-ficha.js';
 import { SolicitudFichaModal } from './solicitud-ficha.js';
 import { iniciarSolicitudesStats } from './solicitudes-stats.js';
+import { iniciarTablero } from './solicitudes-tablero.js';
+import { SolicitudAsistente } from './solicitud-asistente.js';
+import { iniciarProceso } from '../panel/dashboard-proceso.js';
 
 const IDGRID = 'GridSolicitudes';
 const ESTADO_INICIAL = '1'; // como el sistema anterior: por defecto solo las solicitudes activas
 
-function toolbarBtn(id, icon, color, title, texto = '') {
+function toolbarBtn(id, icon, color, title, texto = '', fg = '#fff') {
     const style = `display:inline-flex;align-items:center;justify-content:center;gap:6px;height:32px;padding:0 ${texto ? 12 : 9}px;min-width:32px;font-size:13px;font-weight:600;`
-        + `border:1px solid ${color};border-radius:6px;background:${texto ? color : '#fff'};color:${texto ? '#fff' : color};cursor:pointer;`;
+        + `border:1px solid ${color};border-radius:6px;background:${texto ? color : '#fff'};color:${texto ? fg : color};cursor:pointer;`;
     return `<button type="button" id="${id}" title="${title}" style="${style}"><i class="fa-solid ${icon}"></i>${texto}</button>`;
 }
 
 function getToolbarTemplate() {
     return [
         { template: toolbarTitulo('fa-inbox', 'Solicitudes'), align: 'Left' },
+        { template: toolbarBtn('btnAsistente', 'fa-wand-magic-sparkles', 'rgb(var(--grid-light-primary, 124, 58, 237))', 'Crear la solicitud con el asistente', 'Asistente', 'rgb(var(--grid-light-on-primary, 255, 255, 255))'), align: 'Right' },
         { template: toolbarBtn('btnNuevaSolicitud', 'fa-plus', '#2563eb', 'Nueva solicitud', 'Nueva'), align: 'Right' },
         { template: toolbarBtn('btnDescargarExcel', 'fa-file-excel', '#198754', 'Exportar a Excel'), align: 'Right' },
         { template: toolbarBtn('btnModalCsv', 'fa-file-csv', '#0891b2', 'Exportar a CSV'), align: 'Right' },
@@ -51,12 +55,22 @@ document.addEventListener('DOMContentLoaded', () => {
     Grid.Inject(Toolbar, ColumnChooser, Filter, Page, Sort, Resize, Reorder);
 
     // Mismo panel de seguimiento del tablero: al hacer clic en una solicitud se abre en media pantalla.
-    const panel = new ActividadFichaModal({ panelUrl: config.panelUrl, csrfToken, onSaved: () => grid.refresh() });
+    const panel = new ActividadFichaModal({ panelUrl: config.panelUrl, csrfToken, onSaved: () => { grid.refresh(); tablero.recargar(); } });
     // Crear y editar la solicitud (datos, productos, detalle/correo y estado).
     const ficha = new SolicitudFichaModal({
-        fichaUrl: config.fichaUrl, nuevoUrl: config.nuevaUrl, csrfToken, onSaved: () => { grid.refresh(); stats.cargar(true); },
+        fichaUrl: config.fichaUrl, nuevoUrl: config.nuevaUrl, csrfToken, onSaved: () => { grid.refresh(); tablero.recargar(); stats.cargar(true); },
     });
     let currentActividad = '';
+
+    // Barra de pasos del proceso comercial arriba; los demás pasos abren sus documentos en el panel de seguimiento.
+    iniciarProceso({
+        url: config.procesoUrl,
+        urlDocumentos: config.procesoDocsUrl,
+        getAlcance: () => 'todos',
+        activa: 'solicitud',
+        compacta: true,
+        onAbrir: (modulo, id, lista) => { panel.lista = lista ? { ...lista, vistos: new Set() } : null; panel.abrirDocumento(modulo, id); },
+    }).cargar();
 
     class CustomPostAdaptor extends UrlAdaptor {
         processQuery(ds, query, hierarchyFilters) {
@@ -254,6 +268,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Tarjetas de arriba: elegir una filtra el listado por sus estados (y deja sin efecto el filtro «Estado» de la columna).
     const aplicarActividad = (actividad) => {
         currentActividad = actividad;
+        tablero.soloEtapa(actividad); // el tablero muestra solo la etapa elegida (las claves coinciden)
         if (actividad) {
             const lista = document.getElementById('estado')?.ej2_instances?.[0];
             if (lista?.value) lista.value = '';
@@ -263,7 +278,41 @@ document.addEventListener('DOMContentLoaded', () => {
     };
     const stats = iniciarSolicitudesStats({ url: config.estadisticasUrl, onFiltro: ({ actividad }) => aplicarActividad(actividad) });
 
+    // Vista por defecto: tablero. La tabla (grid) sigue disponible para filtrar, ordenar y exportar.
+    const vistaTablero = document.getElementById('vistaTablero');
+    const vistaTabla = document.getElementById('vistaTabla');
+    const tablero = iniciarTablero({
+        raiz: vistaTablero, config, csrfToken, ficha, panel, onCambio: () => { grid.refresh(); stats.cargar(true); },
+    });
+    const CLAVE_VISTA = 'solicitudes-vista';
+    const mostrarVista = (vista) => {
+        const esTablero = vista !== 'tabla';
+        vistaTablero.classList.toggle('vista-oculta', !esTablero);
+        vistaTabla.classList.toggle('vista-oculta', esTablero);
+        document.querySelectorAll('[data-vista]').forEach((b) => b.classList.toggle('on', b.dataset.vista === (esTablero ? 'tablero' : 'tabla')));
+        if (esTablero) tablero.mostrar(); else { grid.refresh(); window.dispatchEvent(new Event('resize')); }
+        try { localStorage.setItem(CLAVE_VISTA, vista); } catch { /* sin almacenamiento */ }
+    };
+    document.querySelectorAll('[data-vista]').forEach((b) => b.addEventListener('click', () => mostrarVista(b.dataset.vista)));
+    vistaTablero.querySelector('[data-kb-nueva]').addEventListener('click', () => ficha.abrirNuevo());
+    vistaTablero.querySelector('[data-kb-recargar]').addEventListener('click', () => { tablero.recargar(); stats.cargar(true); });
+    let vistaInicial = 'tablero';
+    try { vistaInicial = localStorage.getItem(CLAVE_VISTA) === 'tabla' ? 'tabla' : 'tablero'; } catch { /* sin almacenamiento */ }
+    mostrarVista(vistaInicial);
+
     document.getElementById('btnNuevaSolicitud').addEventListener('click', () => ficha.abrirNuevo());
+
+    // Asistente de creación: al terminar se refresca el listado y se abre la solicitud nueva para seguir con el detalle y el correo.
+    const asistente = new SolicitudAsistente({
+        urls: config.asistente,
+        csrfToken,
+        onCreada: (id) => {
+            grid.refresh(); tablero.recargar(); stats.cargar(true);
+            ficha.abrir(id);
+        },
+    });
+    document.getElementById('btnAsistente').addEventListener('click', () => asistente.abrir());
+    vistaTablero.querySelector('[data-kb-asistente]').addEventListener('click', () => asistente.abrir());
 
     document.getElementById('reloadGrid').addEventListener('click', () => {
         AdvancedGridUX.invalidateCache(grid);
@@ -273,6 +322,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     document.getElementById('resetGrid').addEventListener('click', () => {
         currentActividad = '';
+        tablero.soloEtapa('');
         stats.limpiar();
         grid.query = new Query();
         grid.allowFiltering = false;

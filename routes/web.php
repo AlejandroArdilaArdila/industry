@@ -12,15 +12,19 @@ use App\Http\Controllers\Panel\Facturas\FacturasGridController;
 use App\Http\Controllers\Panel\Facturas\FacturasPageController;
 use App\Http\Controllers\Panel\Facturas\FacturasProveedorGridController;
 use App\Http\Controllers\Panel\Facturas\FacturasProveedorPageController;
+use App\Http\Controllers\Panel\Cotizaciones\CotizacionesController;
+use App\Http\Controllers\Panel\Localizacion\LocalizacionController;
 use App\Http\Controllers\Panel\Perfil\PerfilController;
 use App\Http\Controllers\Panel\Productos\ProductoFichaController;
 use App\Http\Controllers\Panel\Productos\ProductosEstadisticasController;
 use App\Http\Controllers\Panel\Productos\ProductosGridController;
 use App\Http\Controllers\Panel\Productos\ProductosPageController;
 use App\Http\Controllers\Panel\Societe\TerceroFichaController;
+use App\Http\Controllers\Panel\Solicitudes\SolicitudAsistenteController;
 use App\Http\Controllers\Panel\Solicitudes\SolicitudFichaController;
 use App\Http\Controllers\Panel\Solicitudes\SolicitudesGridController;
 use App\Http\Controllers\Panel\Solicitudes\SolicitudesPageController;
+use App\Http\Controllers\Panel\Solicitudes\SolicitudesTableroController;
 use App\Http\Controllers\Panel\Societe\TerceroIaController;
 use App\Http\Controllers\Panel\Societe\TercerosEstadisticasController;
 use App\Http\Controllers\Panel\Societe\TercerosGridController;
@@ -67,6 +71,21 @@ Route::prefix('panel')->name('panel.')->middleware('auth:web')->group(function (
         Route::get('/', [SolicitudesPageController::class, 'index'])->name('index');
         Route::post('/data', [SolicitudesGridController::class, 'data'])->name('data');
         Route::get('/estadisticas', [SolicitudesPageController::class, 'estadisticas'])->name('estadisticas');
+        Route::get('/asistente/clientes', [SolicitudAsistenteController::class, 'clientes'])->name('asistente.clientes');
+        Route::get('/asistente/cliente/{cliente}', [SolicitudAsistenteController::class, 'cliente'])->whereNumber('cliente')->name('asistente.cliente');
+        Route::get('/asistente/cliente/{cliente}/efectividad', [SolicitudAsistenteController::class, 'efectividad'])->whereNumber('cliente')->name('asistente.cliente.efectividad');
+        Route::get('/asistente/cliente/{cliente}/piezas', [SolicitudAsistenteController::class, 'piezasCliente'])->whereNumber('cliente')->name('asistente.cliente.piezas');
+        Route::post('/asistente/cliente/{cliente}/coincidencias', [SolicitudAsistenteController::class, 'coincidencias'])->whereNumber('cliente')->name('asistente.cliente.coincidencias');
+        Route::post('/asistente/historial', [SolicitudAsistenteController::class, 'historial'])->name('asistente.historial');
+        Route::get('/asistente/correo/contexto', [SolicitudAsistenteController::class, 'correoContexto'])->name('asistente.correo.contexto');
+        Route::post('/asistente/correo/redactar', [SolicitudAsistenteController::class, 'correoRedactar'])->name('asistente.correo.redactar');
+        Route::post('/asistente/interpretar', [SolicitudAsistenteController::class, 'interpretar'])->name('asistente.interpretar');
+        Route::post('/asistente/analizar', [SolicitudAsistenteController::class, 'analizar'])->name('asistente.analizar');
+        Route::get('/asistente/prompt', [SolicitudAsistenteController::class, 'prompt'])->name('asistente.prompt');
+        Route::put('/asistente/prompt', [SolicitudAsistenteController::class, 'guardarPrompt'])->name('asistente.prompt.guardar');
+        Route::get('/tablero/motivos', [SolicitudesTableroController::class, 'motivos'])->name('tablero.motivos');
+        Route::get('/tablero/{columna}', [SolicitudesTableroController::class, 'columna'])->where('columna', '[a-z]+')->name('tablero.columna');
+        Route::post('/{solicitud}/mover', [SolicitudesTableroController::class, 'mover'])->whereNumber('solicitud')->name('mover');
         Route::post('/export/xlsx', [SolicitudesGridController::class, 'exportXlsx'])->name('export.xlsx');
         Route::post('/export/csv', [SolicitudesGridController::class, 'exportCsv'])->name('export.csv');
 
@@ -82,6 +101,26 @@ Route::prefix('panel')->name('panel.')->middleware('auth:web')->group(function (
         Route::post('/{solicitud}/correo-ia', [SolicitudFichaController::class, 'redactarCorreo'])->whereNumber('solicitud')->name('correo-ia');
         Route::post('/{solicitud}/cerrar', [SolicitudFichaController::class, 'cerrar'])->whereNumber('solicitud')->name('cerrar');
         Route::post('/{solicitud}/reabrir', [SolicitudFichaController::class, 'reabrir'])->whereNumber('solicitud')->name('reabrir');
+    });
+
+    Route::prefix('cotizaciones')->name('cotizaciones.')->group(function () {
+        Route::get('/', [CotizacionesController::class, 'index'])->name('index');
+        Route::get('/tablero/{columna}', [CotizacionesController::class, 'columna'])->where('columna', '[a-z]+')->name('tablero.columna');
+    });
+
+    Route::prefix('localizacion')->name('localizacion.')->group(function () {
+        Route::get('/', [LocalizacionController::class, 'index'])->name('index');
+        Route::get('/listado', [LocalizacionController::class, 'listado'])->name('listado');
+        Route::get('/tablero/{columna}', [LocalizacionController::class, 'columna'])->where('columna', '[a-z]+')->name('tablero.columna');
+        Route::get('/contexto', [LocalizacionController::class, 'contexto'])->name('contexto');
+        Route::post('/sugeridos', [LocalizacionController::class, 'sugeridos'])->name('sugeridos');
+        Route::get('/proveedores', [LocalizacionController::class, 'buscar'])->name('proveedores');
+        Route::get('/proveedores/{proveedor}', [LocalizacionController::class, 'proveedor'])->whereNumber('proveedor')->name('proveedor');
+        Route::get('/prompt', [LocalizacionController::class, 'prompt'])->name('prompt');
+        Route::put('/prompt', [LocalizacionController::class, 'guardarPrompt'])->name('prompt.guardar');
+        Route::get('/{solicitud}', [LocalizacionController::class, 'solicitudDetalle'])->whereNumber('solicitud')->name('solicitud');
+        Route::post('/{solicitud}/redactar', [LocalizacionController::class, 'redactar'])->whereNumber('solicitud')->name('redactar');
+        Route::post('/{solicitud}/enviar', [LocalizacionController::class, 'enviar'])->whereNumber('solicitud')->name('enviar');
     });
 
     Route::prefix('trm')->name('trm.')->group(function () {

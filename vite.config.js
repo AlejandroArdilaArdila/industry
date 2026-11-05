@@ -18,6 +18,8 @@ export default defineConfig({
                 'resources/js/productos/productos-grid.js',
                 'resources/js/categorias/categorias-grid.js',
                 'resources/js/solicitudes/solicitudes-grid.js',
+                'resources/js/localizacion/localizacion.js',
+                'resources/js/cotizaciones/cotizaciones.js',
                 'resources/js/facturas/facturas-grid.js',
                 'resources/js/facturas/facturas-proveedores-grid.js',
             ],

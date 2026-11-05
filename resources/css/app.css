@@ -4,6 +4,14 @@
 /* dark: sigue a la clase .dark que pone el selector de tema (no a la preferencia del SO). */
 @custom-variant dark (&:where(.dark, .dark *));
 
+/* Tokens de marca: lo que antes era un violeta fijo ahora sigue el tema y los colores de marca del selector. */
+:root {
+    --brand: var(--primary);
+    --brand-fg: var(--primary-foreground);
+    /* Segundo tono de los degradados: el acento elegido o, si no hay, el primario más oscuro. */
+    --brand-2: var(--brand-accent, color-mix(in oklab, var(--primary) 72%, #000));
+}
+
 @source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
 @source '../../storage/framework/views/*.php';
 

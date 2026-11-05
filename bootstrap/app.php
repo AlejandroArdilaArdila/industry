@@ -35,8 +35,13 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->prepend(TrimTrailingSlash::class);
 
-        if (env('PANEL_ENABLED', false)) {
-            $middleware->redirectGuestsTo(fn () => route('login'));
+        if (env('PANEL_ENABLED', true)) {
+            // Sesión cerrada/expirada: al login con el motivo (y la página pedida queda como "intended").
+            $middleware->redirectGuestsTo(function (Request $request) {
+                $request->session()->flash('aviso_sesion', App\Support\MotivoSesion::mensaje());
+
+                return route('login');
+            });
             $middleware->redirectUsersTo(fn () => route('panel.dashboard'));
         } else {
             // withMiddleware() ya registró por defecto redirectGuestsTo(route('login')),
@@ -52,6 +57,15 @@ return Application::configure(basePath: dirname(__DIR__))
         $exceptions->shouldRenderJsonWhen(
             fn (Request $request) => $request->is('api/*') || $request->expectsJson(),
         );
+
+        // Token CSRF vencido en un formulario normal = la sesión ya no existe: al login con el motivo.
+        $exceptions->render(function (\Illuminate\Session\TokenMismatchException $e, Request $request) {
+            if ($request->expectsJson() || $request->is('api/*')) {
+                return null;
+            }
+
+            return redirect()->route('login')->with('aviso_sesion', App\Support\MotivoSesion::mensaje());
+        });
 
         // El POS sube cada respuesta de error a pos_logs_errores tal cual la
         // manda Laravel: con APP_DEBUG=true eso incluye el trace completo

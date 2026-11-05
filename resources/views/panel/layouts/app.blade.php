@@ -12,6 +12,10 @@
             var color = localStorage.getItem('panel-theme-color');
             if (color) html.setAttribute('data-theme', color);
             if (localStorage.getItem('panel-theme-mode') === 'dark') html.classList.add('dark', 'e-dark-mode');
+            try {
+                var marca = JSON.parse(localStorage.getItem('panel-theme-brand-vars') || 'null');
+                if (marca) Object.keys(marca).forEach(function (k) { html.style.setProperty(k, marca[k]); });
+            } catch (e) {}
         })();
     </script>
     @vite(['resources/css/app.css', 'resources/js/app.js', 'resources/js/panel/layout.js'])
@@ -76,6 +80,32 @@
                                                 class="theme-color-btn w-8 h-8 rounded-full {{ $swatchClass }} ring-2 ring-offset-2 ring-offset-popover ring-transparent transition-all"></button>
                                         @endforeach
                                     </div>
+                                </div>
+
+                                <div class="p-3 border-b border-border">
+                                    <p class="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wide">Colores de marca</p>
+                                    <div class="space-y-2">
+                                        @foreach (['primary' => 'Botones y énfasis', 'accent' => 'Acento', 'sidebar' => 'Barra superior y lateral'] as $campo => $etiqueta)
+                                            <label class="flex items-center justify-between gap-3 text-sm">
+                                                <span>{{ $etiqueta }}</span>
+                                                <span class="flex items-center gap-2">
+                                                    <span class="font-mono text-[11px] text-muted-foreground" data-marca-hex="{{ $campo }}"></span>
+                                                    <input type="color" data-marca="{{ $campo }}" class="h-7 w-9 cursor-pointer rounded border border-border bg-transparent p-0.5">
+                                                </span>
+                                            </label>
+                                        @endforeach
+                                    </div>
+                                    <div class="mt-3 flex gap-2">
+                                        <button type="button" data-marca-logo="{{ asset('logo.png') }}"
+                                            class="flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:opacity-90">
+                                            <i class="fa-solid fa-wand-magic-sparkles"></i> Tomar del logo
+                                        </button>
+                                        <button type="button" data-marca-reset title="Volver a los colores del tema"
+                                            class="hidden px-3 py-2 rounded-lg border border-border text-sm font-medium text-muted-foreground hover:bg-muted">
+                                            <i class="fa-solid fa-rotate-left"></i>
+                                        </button>
+                                    </div>
+                                    <p class="mt-2 text-xs text-muted-foreground" data-marca-aviso></p>
                                 </div>
 
                                 <div class="p-3">

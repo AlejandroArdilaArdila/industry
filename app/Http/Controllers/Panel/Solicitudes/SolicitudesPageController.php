@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Panel\Solicitudes;
 
 use App\Http\Controllers\Controller;
 use App\Services\Panel\SolicitudesEstadisticasService;
+use App\Services\Panel\SolicitudesTableroService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -12,10 +13,11 @@ use Illuminate\View\View;
 
 class SolicitudesPageController extends Controller
 {
-    public function index(): View
+    public function index(SolicitudesTableroService $tablero): View
     {
         return view('panel.solicitudes.solicitudes', [
             'estados' => SolicitudesGridController::ESTADOS,
+            'tablero' => $tablero->definicion(),
         ]);
     }
 

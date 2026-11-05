@@ -9,6 +9,9 @@
         <div class="h-10 w-10 animate-spin rounded-full border-4 border-white border-t-transparent"></div>
     </div>
 
+    {{-- Línea de proceso comercial (la del panel): estamos en el paso «Solicitud» --}}
+    <div id="d-proceso" class="pr pr-barra flex-none" aria-label="Proceso comercial"><div class="vacio"><i class="fa-solid fa-circle-notch fa-spin"></i></div></div>
+
     <section id="solicitudes-stats" class="st flex-none" aria-label="Estadísticas de solicitudes">
         <div class="st-bar">
             <b><i class="fa-solid fa-chart-simple"></i> Resumen de solicitudes</b>
@@ -20,8 +23,36 @@
     </section>
 
     <div class="relative min-h-0 flex-1">
-        <div class="absolute inset-0">
-            <div id="GridSolicitudes" class="e-grid e-lib e-responsive"></div>
+        <div id="vistaTablero" class="kb absolute inset-0">
+            <div class="kb-barra">
+                <h2><i class="fa-solid fa-table-columns"></i> Solicitudes</h2>
+                <label class="kb-buscar"><i class="fa-solid fa-magnifying-glass"></i><input type="search" data-kb-q placeholder="Buscar ref, cliente o asunto" autocomplete="off"></label>
+                <select class="kb-select" data-kb-estado aria-label="Filtrar por estado">
+                    <option value="">Todos los estados</option>
+                    @foreach ($tablero['estados'] as $e)
+                        @if ($e['id'] !== 9)<option value="{{ $e['id'] }}">{{ $e['nombre'] }}</option>@endif
+                    @endforeach
+                </select>
+                <div class="espacio">
+                    <button type="button" class="kb-btn" data-kb-recargar title="Recargar"><i class="fa-solid fa-rotate"></i></button>
+                    <button type="button" class="kb-btn asistente" data-kb-asistente title="Crear la solicitud conversando: cliente, contacto, elemento, historial y análisis con IA"><i class="fa-solid fa-wand-magic-sparkles"></i>Crear con asistente</button>
+                    <button type="button" class="kb-btn primario" data-kb-nueva><i class="fa-solid fa-plus"></i>Nueva</button>
+                    <div class="kb-vista" role="group" aria-label="Vista">
+                        <button type="button" data-vista="tablero" class="on"><i class="fa-solid fa-table-columns"></i>Tablero</button>
+                        <button type="button" data-vista="tabla"><i class="fa-solid fa-table-list"></i>Tabla</button>
+                    </div>
+                </div>
+            </div>
+            <div class="kb-cuerpo" data-kb-cuerpo></div>
+        </div>
+        <div id="vistaTabla" class="absolute inset-0 vista-oculta">
+            <div class="absolute inset-0 flex flex-col">
+                <div class="kb-vista" style="align-self:flex-end;margin:6px 12px 0" role="group" aria-label="Vista">
+                    <button type="button" data-vista="tablero"><i class="fa-solid fa-table-columns"></i>Tablero</button>
+                    <button type="button" data-vista="tabla" class="on"><i class="fa-solid fa-table-list"></i>Tabla</button>
+                </div>
+                <div class="relative min-h-0 flex-1"><div class="absolute inset-0"><div id="GridSolicitudes" class="e-grid e-lib e-responsive"></div></div></div>
+            </div>
         </div>
     </div>
 </div>
@@ -37,7 +68,29 @@
             fichaUrl: @json(route('panel.solicitudes.ficha', '__ID__')),
             nuevaUrl: @json(route('panel.solicitudes.nueva')),
             panelUrl: @json(route('panel.actividades.panel')),
+            procesoUrl: @json(route('panel.dashboard.proceso')),
+            procesoDocsUrl: @json(route('panel.dashboard.proceso.documentos', ['etapa' => '__E__'])),
             estados: @json($estados),
+            asistente: {
+                clientesUrl: @json(route('panel.solicitudes.asistente.clientes')),
+                clienteUrl: @json(route('panel.solicitudes.asistente.cliente', '__ID__')),
+                historialUrl: @json(route('panel.solicitudes.asistente.historial')),
+                correoContextoUrl: @json(route('panel.solicitudes.asistente.correo.contexto')),
+                correoRedactarUrl: @json(route('panel.solicitudes.asistente.correo.redactar')),
+                interpretarUrl: @json(route('panel.solicitudes.asistente.interpretar')),
+                analizarUrl: @json(route('panel.solicitudes.asistente.analizar')),
+                promptUrl: @json(route('panel.solicitudes.asistente.prompt')),
+                productosUrl: @json(route('panel.solicitudes.productos')),
+                storeUrl: @json(route('panel.solicitudes.store')),
+            },
+            tablero: {
+                columnas: @json($tablero['columnas']),
+                estados: @json($tablero['estados']),
+                columnaUrl: @json(route('panel.solicitudes.tablero.columna', '__COL__')),
+                motivosUrl: @json(route('panel.solicitudes.tablero.motivos')),
+                moverUrl: @json(route('panel.solicitudes.mover', '__ID__')),
+                seguimientoUrl: @json(route('panel.actividades.store')),
+            },
         };
     </script>
     @vite(['resources/js/solicitudes/solicitudes-grid.js'])

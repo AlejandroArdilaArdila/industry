@@ -25,7 +25,7 @@ class ProcesoComercialService
     ];
 
     /** Estados numéricos de cada documento (clases de Dolibarr solicitudes, cotizaciones y ordencompra). */
-    private const ESTADOS = [
+    public const ESTADOS = [
         'solicitud' => [0 => 'Borrador', 1 => 'Activa', 2 => 'En solicitud de cotización exterior', 3 => 'En solicitud de cotización local', 4 => 'Importación', 5 => 'Cotización enviada',
             6 => 'En solicitud de cotización USA', 9 => 'Cancelada', 10 => 'Orden de compra abierta', 11 => 'Orden enviada', 12 => 'Orden en aprobación', 13 => 'Orden en liquidación',
             14 => 'Orden liquidada', 15 => 'Orden aprobada', 16 => 'Orden pagada y en seguimiento', 17 => 'Desembolso solicitado', 18 => 'Desembolso realizado',

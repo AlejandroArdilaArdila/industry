@@ -4,6 +4,7 @@ namespace App\Services\Ia;
 
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 
 /**
  * Cliente mínimo de los tres proveedores (Claude, OpenAI y Gemini) para conversaciones de texto.
@@ -19,10 +20,11 @@ class IaClient
      * @param  array<int, array{role: 'user'|'assistant', content: string}>  $mensajes  empieza y termina en 'user'
      * @param  bool  $web  permitir búsqueda en internet (solo Claude y Gemini; en OpenAI se ignora)
      * @param  array<int, array{mime: string, data: string, nombre?: string}>  $adjuntos  archivos (PDF o imagen, `data` en base64) que se adjuntan al último mensaje del usuario
+     * @param  int  $maxTokens  tope de la respuesta (solo Claude; las respuestas largas con JSON necesitan más de 2000)
      *
      * @throws IaException
      */
-    public function chat(string $proveedor, string $system, array $mensajes, bool $web = false, bool $json = true, array $adjuntos = []): string
+    public function chat(string $proveedor, string $system, array $mensajes, bool $web = false, bool $json = true, array $adjuntos = [], int $maxTokens = 2000): string
     {
         $token = $this->config->token($proveedor);
         if (! $token) {
@@ -32,7 +34,7 @@ class IaClient
         $web = $web && IaConfigService::PROVEEDORES[$proveedor]['web'];
 
         return match ($proveedor) {
-            'anthropic' => $this->anthropic($token, $modelo, $system, $this->conAdjuntos($mensajes, $adjuntos, 'anthropic'), $web),
+            'anthropic' => $this->anthropic($token, $modelo, $system, $this->conAdjuntos($mensajes, $adjuntos, 'anthropic'), $web, $maxTokens),
             'openai' => $this->openai($token, $modelo, $system, $this->conAdjuntos($mensajes, $adjuntos, 'openai'), $json),
             'gemini' => $this->gemini($token, $modelo, $system, $this->conAdjuntos($mensajes, $adjuntos, 'gemini'), $web, $json),
         };
@@ -79,20 +81,38 @@ class IaClient
         throw new IaException("{$proveedor} respondió {$res->status()}{$hint}: ".mb_substr((string) $msg, 0, 300));
     }
 
-    private function anthropic(string $token, string $modelo, string $system, array $mensajes, bool $web): string
+    private function anthropic(string $token, string $modelo, string $system, array $mensajes, bool $web, int $maxTokens = 2000): string
     {
-        $body = ['model' => $modelo, 'max_tokens' => 2000, 'system' => $system, 'messages' => $mensajes];
+        $body = ['model' => $modelo, 'max_tokens' => $maxTokens, 'system' => $system, 'messages' => $mensajes];
         if ($web) {
             $body['tools'] = [['type' => 'web_search_20250305', 'name' => 'web_search', 'max_uses' => 3]];
         }
-        $res = $this->http()->withHeaders(['x-api-key' => $token, 'anthropic-version' => '2023-06-01'])->post('https://api.anthropic.com/v1/messages', $body);
-        if ($res->failed()) {
-            $this->fallo($res, 'Claude');
+        // Con búsqueda web Claude puede pausar el turno (`pause_turn`): se le devuelve lo que llevaba para que continúe.
+        for ($vuelta = 0; $vuelta < 3; $vuelta++) {
+            $res = $this->http()->withHeaders(['x-api-key' => $token, 'anthropic-version' => '2023-06-01'])->post('https://api.anthropic.com/v1/messages', $body);
+            if ($res->failed()) {
+                $this->fallo($res, 'Claude');
+            }
+            if ($res->json('stop_reason') !== 'pause_turn') {
+                break;
+            }
+            $body['messages'][] = ['role' => 'assistant', 'content' => $res->json('content', [])];
         }
-        // La respuesta mezcla bloques de búsqueda y de texto: el JSON final está en el último bloque de texto.
-        $textos = collect($res->json('content', []))->where('type', 'text')->pluck('text');
 
-        return trim((string) $textos->last());
+        // La respuesta mezcla bloques de búsqueda y de texto. La respuesta final es todo el texto que viene después del último bloque
+        // de búsqueda (con citas llega partida en varios bloques), y ahí está el JSON.
+        $bloques = collect($res->json('content', []));
+        $ultimaBusqueda = $bloques->keys()->filter(fn ($i) => in_array($bloques[$i]['type'] ?? '', ['server_tool_use', 'web_search_tool_result'], true))->last();
+        $texto = trim($bloques->filter(fn ($b, $i) => ($b['type'] ?? '') === 'text' && ($ultimaBusqueda === null || $i > $ultimaBusqueda))->pluck('text')->implode(''));
+        if ($texto === '') {
+            $texto = trim($bloques->where('type', 'text')->pluck('text')->implode(''));
+        }
+        if ($res->json('stop_reason') === 'max_tokens') {
+            Log::warning('IA: respuesta cortada por max_tokens', ['modelo' => $modelo, 'max_tokens' => $maxTokens, 'largo' => strlen($texto)]);
+            throw new IaException('La respuesta de la IA se cortó por ser muy larga. Inténtalo de nuevo.');
+        }
+
+        return $texto;
     }
 
     private function openai(string $token, string $modelo, string $system, array $mensajes, bool $json): string

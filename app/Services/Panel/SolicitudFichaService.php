@@ -65,9 +65,16 @@ class SolicitudFichaService
     /** Contactos del cliente (con correo cuando lo tienen). */
     public function contactos(int $fkSoc): array
     {
-        $rows = DB::select("SELECT rowid, TRIM(CONCAT_WS(' ', firstname, lastname)) nombre, email FROM {$this->p}socpeople WHERE fk_soc = ? AND statut = 1 ORDER BY lastname, firstname", [$fkSoc]);
+        $rows = DB::select("SELECT rowid, TRIM(CONCAT_WS(' ', firstname, lastname)) nombre, email, poste, phone, phone_mobile, phone_perso, birthday
+            FROM {$this->p}socpeople WHERE fk_soc = ? AND statut = 1 ORDER BY lastname, firstname", [$fkSoc]);
 
-        return array_map(fn ($c) => ['id' => (int) $c->rowid, 'label' => trim(($c->nombre ?: 'Sin nombre').($c->email ? ' — '.$c->email : '')), 'email' => (string) $c->email], $rows);
+        return array_map(fn ($c) => [
+            'id' => (int) $c->rowid, 'label' => trim(($c->nombre ?: 'Sin nombre').($c->email ? ' — '.$c->email : '')), 'email' => (string) $c->email,
+            'nombre' => $c->nombre ?: 'Sin nombre', 'cargo' => trim((string) $c->poste),
+            // Fijo, móvil y personal, sin repetidos ni vacíos.
+            'telefonos' => array_values(array_unique(array_filter(array_map(fn ($t) => trim((string) $t), [$c->phone_mobile, $c->phone, $c->phone_perso])))),
+            'cumple' => $c->birthday ? substr((string) $c->birthday, 0, 10) : null,
+        ], $rows);
     }
 
     public function productos(string $q, int $limite = 12): array
@@ -329,10 +336,45 @@ class SolicitudFichaService
         return $out;
     }
 
+    /**
+     * Firma del usuario (campo «signature» de Dolibarr) como HTML limpio para un correo: texto plano pasa a párrafos, y del HTML
+     * se quitan scripts, manejadores de eventos y enlaces javascript:. Conserva imágenes (logos) y enlaces.
+     */
+    public function firmaHtml(object $usuario): string
+    {
+        try {
+            $f = trim((string) (DB::selectOne("SELECT signature FROM {$this->p}user WHERE rowid = ?", [$usuario->getKey()])->signature ?? ''));
+        } catch (\Throwable) {
+            return '';
+        }
+        if ($f === '') {
+            return '';
+        }
+        if (! preg_match('/<[a-z][\s\S]*>/i', $f)) {
+            return nl2br(e($f));
+        }
+        $f = strip_tags($f, '<p><br><div><span><b><strong><i><em><u><a><img><table><tbody><tr><td><font>');
+        $f = preg_replace('/\son\w+\s*=\s*("[^"]*"|\'[^\']*\'|[^\s>]+)/i', '', $f);
+        $f = preg_replace('/(href|src)\s*=\s*(["\'])\s*javascript:[^"\']*\2/i', '$1=$2#$2', $f);
+
+        // Dolibarr guarda las imágenes con ruta relativa a su servidor («/viewimage.php?…»): aquí y en el correo que recibe el cliente
+        // no existirían, así que se completan con la dirección de Dolibarr.
+        $base = rtrim((string) config('services.dolibarr.url'), '/');
+        if ($base !== '') {
+            $f = preg_replace_callback('/(<img\b[^>]*?\bsrc\s*=\s*)(["\'])(\/(?!\/)[^"\']*)\2/i', fn ($m) => $m[1].$m[2].$base.$m[3].$m[2], $f);
+        }
+
+        return trim($f);
+    }
+
     private function guardarDetalle(object $usuario, object $sol, array $d): void
     {
         // El detalle es HTML escrito en el editor de la ficha: se conservan solo las etiquetas de formato básicas.
         $detalle = strip_tags((string) ($d['detalle'] ?? ''), '<p><br><div><span><b><strong><i><em><u><ul><ol><li><a><h1><h2><h3><h4><table><thead><tbody><tr><td><th>');
+        // Con «incluir_firma» (asistente de creación) la firma del asesor se añade al final, ya limpia, tal como se vio en la vista previa.
+        if (! empty($d['incluir_firma']) && ($firma = $this->firmaHtml($usuario)) !== '') {
+            $detalle .= '<br><br>'.$firma;
+        }
         DB::table('solicitudes_solicitud')->where('rowid', $sol->rowid)->update(['detalle' => $detalle, 'fk_user_modif' => $usuario->getKey()]);
 
         if (! empty($d['enviar_correo'])) {

@@ -152,7 +152,60 @@ class ActividadesService
         $c = DB::selectOne("SELECT COUNT(*) n, COALESCE(SUM({$cot['valor']}),0) v FROM {$cot['from']} WHERE t.fk_soc = ? AND {$cot['serie']}", [$fkSoc]);
         $o = DB::selectOne("SELECT COUNT(*) n, COALESCE(SUM({$ord['valor']}),0) v FROM {$ord['from']} WHERE t.fk_soc = ? AND {$ord['serie']}", [$fkSoc]);
 
-        return ['solicitudes' => $sol, 'cotizaciones' => (int) $c->n, 'ordenes' => (int) $o->n, 'montoCotizado' => round((float) $c->v), 'montoOrdenes' => round((float) $o->v)];
+        // Última fecha de cada tipo y última gestión (seguimiento o cambio en alguna solicitud del cliente).
+        $ult = fn (array $d) => DB::selectOne("SELECT MAX(t.date_creation) f FROM {$d['from']} WHERE t.fk_soc = ? AND {$d['serie']}", [$fkSoc])->f;
+        $sd = $dash->definicionEtapa('solicitud', $uf);
+        $gest = DB::selectOne("SELECT GREATEST(COALESCE(MAX(o.tms), '1970-01-01'), COALESCE(MAX(t.tms), '1970-01-01')) f
+            FROM {$p}solicitudes_solicitud t LEFT JOIN {$p}observaciones_solicitudes o ON o.fk_solicitud = t.rowid WHERE t.fk_soc = ? AND t.status > 0", [$fkSoc])->f;
+        $dia = fn ($v) => $v && substr((string) $v, 0, 4) > '1970' ? substr((string) $v, 0, 10) : null;
+
+        return [
+            'solicitudes' => $sol, 'cotizaciones' => (int) $c->n, 'ordenes' => (int) $o->n,
+            'montoCotizado' => round((float) $c->v), 'montoOrdenes' => round((float) $o->v),
+            'ultimaSolicitud' => $dia($ult($sd)), 'ultimaCotizacion' => $dia($ult($cot)), 'ultimaOrden' => $dia($ult($ord)),
+            'ultimaGestion' => $dia($gest),
+        ];
+    }
+
+    /**
+     * Efectividad del cliente en un periodo (por fecha de creación): de las solicitudes que hizo, cuántas llegaron a cotización, y de las
+     * cotizaciones que le enviamos, cuántas terminaron en orden de compra (con su monto). Es por cohorte: cada documento cuenta si tiene el siguiente.
+     *
+     * @return array{desde: string, hasta: string, solicitudes: int, conCotizacion: int, cotizaciones: int, conOrden: int, montoCotizado: float, montoGanado: float, pctCotizadas: ?float, pctCierre: ?float, pctMonto: ?float, pctGlobal: ?float}
+     */
+    public function efectividadCliente(int $fkSoc, Carbon $desde, Carbon $hasta): array
+    {
+        $dash = app(PanelDashboardService::class);
+        $uf = $this->campoUsuario();
+        $p = $this->p;
+        $d = $desde->toDateString();
+        $h = $hasta->toDateString();
+        $cot = $dash->definicionEtapa('cotizacion', $uf);
+        $ord = $dash->definicionEtapa('orden', $uf);
+
+        $conCot = "EXISTS (SELECT 1 FROM {$p}cotizaciones_clientecotizacion c2 WHERE c2.fk_solicitud = t.rowid AND c2.status > 0)";
+        $s = DB::selectOne("SELECT COUNT(*) n, COALESCE(SUM({$conCot}),0) k FROM {$p}solicitudes_solicitud t
+            WHERE t.fk_soc = ? AND t.status > 0 AND DATE(t.date_creation) BETWEEN ? AND ?", [$fkSoc, $d, $h]);
+
+        $conOrd = "EXISTS (SELECT 1 FROM {$p}ordencompra_orden o2 WHERE o2.fk_cliente_cotizacion = t.rowid AND o2.status NOT IN (0,31))";
+        $c = DB::selectOne("SELECT COUNT(*) n, COALESCE(SUM({$conOrd}),0) k, COALESCE(SUM({$cot['valor']}),0) v,
+                COALESCE(SUM(CASE WHEN {$conOrd} THEN {$cot['valor']} ELSE 0 END),0) g
+            FROM {$cot['from']} WHERE t.fk_soc = ? AND {$cot['serie']} AND DATE(t.date_creation) BETWEEN ? AND ?", [$fkSoc, $d, $h]);
+
+        $pct = fn (float $a, float $b) => $b > 0 ? round($a / $b * 100, 1) : null;
+        $sol = (int) $s->n;
+        $cs = (int) $s->k;
+        $cn = (int) $c->n;
+        $co = (int) $c->k;
+
+        return [
+            'desde' => $d, 'hasta' => $h,
+            'solicitudes' => $sol, 'conCotizacion' => $cs, 'cotizaciones' => $cn, 'conOrden' => $co,
+            'montoCotizado' => round((float) $c->v), 'montoGanado' => round((float) $c->g),
+            'pctCotizadas' => $pct($cs, $sol), 'pctCierre' => $pct($co, $cn), 'pctMonto' => $pct((float) $c->g, (float) $c->v),
+            // Efectividad global del embudo: de lo que pidió, qué parte acabó vendida (solicitudes→cotización × cotización→orden).
+            'pctGlobal' => $sol > 0 && $cn > 0 ? round(($cs / $sol) * ($co / $cn) * 100, 1) : ($sol > 0 ? 0.0 : null),
+        ];
     }
 
     /**

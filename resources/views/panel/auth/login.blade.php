@@ -18,6 +18,14 @@
                 INICIAR SESIÓN
             </h1>
 
+            @if (session('aviso_sesion'))
+                <div role="alert"
+                    class="mb-4 flex gap-2 rounded border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+                    <i class="fa-solid fa-clock-rotate-left mt-0.5"></i>
+                    <span>{{ session('aviso_sesion') }}</span>
+                </div>
+            @endif
+
             @if ($errors->any())
                 <div class="mb-4 rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
                     {{ $errors->first() }}

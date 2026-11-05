@@ -459,6 +459,8 @@ function solicitudesIa() {
     const AREA = `${INPUT} min-h-48 font-mono text-[13px] leading-relaxed`;
     const info = {
         productos: 'Se usa al agregar un producto y con «Analizar con IA» en el paso Productos: define cómo analiza el producto y propone dónde comprarlo.',
+        asistente: 'Se usa en el asistente «Crear con asistente» del listado de solicitudes: analiza el elemento que busca el cliente (foto, referencia o descripción) junto con el historial de compras. También se puede editar desde el propio asistente.',
+        localizacion: 'Se usa en el módulo Localización: redacta el correo de solicitud de cotización a cada proveedor (idioma, piezas, qué se le pide y qué no se le puede decir). También se puede editar desde el propio módulo.',
         correo: 'Se usa con «Redactar con IA» en el paso Detalle y correo: define el tono, la estructura y lo que puede o no decir el correo al cliente.',
     };
 

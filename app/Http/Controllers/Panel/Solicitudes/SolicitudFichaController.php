@@ -79,6 +79,7 @@ class SolicitudFichaController extends Controller
                 'detalle' => 'nullable|string|max:65000',
                 'enviar_correo' => 'nullable|boolean',
                 'asunto_correo' => 'nullable|string|max:250',
+                'incluir_firma' => 'nullable|boolean',
             ]),
         };
 

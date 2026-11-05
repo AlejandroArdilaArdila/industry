@@ -16,7 +16,8 @@ const textoSobre = (hex) => {
     return luz > 0.65 ? '#1f2937' : '#ffffff';
 };
 
-export function iniciarProceso({ url, urlDocumentos, getAlcance, onVerAcciones, onAbrir }) {
+// `activa`: clave de la etapa donde estamos (se resalta como «Estás aquí»). `compacta`: sin la tarjeta de la etapa más atrasada.
+export function iniciarProceso({ url, urlDocumentos, getAlcance, onVerAcciones, onAbrir, activa = null, compacta = false }) {
     const cont = document.getElementById('d-proceso');
     if (!cont) return { cargar: () => {} };
     let ctrl = null;
@@ -34,11 +35,12 @@ export function iniciarProceso({ url, urlDocumentos, getAlcance, onVerAcciones, 
             // Color propio de la etapa (Configuración → Panel) o, por defecto, el de la card del tablero de su fuente.
             const propio = e.colorPropio ? `--m:${e.colorPropio};--mt:${textoSobre(e.colorPropio)}` : '';
             const m = propio || (e.card && d.colores?.[e.card] ? `--m:${d.colores[e.card].fondo};--mt:${d.colores[e.card].texto || '#fff'}` : '');
-            return `<li style="${m}" class="pr-paso ${e.pendiente ? '' : 'pr-click'} ${{ verde: 'ok', amarillo: 'aviso', rojo: 'mora', vacio: 'vacio', pend: 'pend' }[e.color]}" ${e.pendiente ? '' : `data-clave="${e.clave}" tabindex="0" role="button"`} title="${esc(e.nombre)}: ${e.pendiente ? 'sin definir (se configura en Configuración → Panel)' : `${nf.format(e.total)} documentos${e.fecha ? ` · ${e.ultima ? 'última' : 'más antigua'}: ${e.fecha}${dias}` : ''}`}">
+            return `<li style="${m}" class="pr-paso ${e.clave === activa ? 'actual' : ''} ${e.pendiente || e.clave === activa ? '' : 'pr-click'} ${{ verde: 'ok', amarillo: 'aviso', rojo: 'mora', vacio: 'vacio', pend: 'pend' }[e.color]}" ${e.pendiente || e.clave === activa ? '' : `data-clave="${e.clave}" tabindex="0" role="button"`} ${e.clave === activa ? 'aria-current="step"' : ''} title="${esc(e.nombre)}: ${e.pendiente ? 'sin definir (se configura en Configuración → Panel)' : `${nf.format(e.total)} documentos${e.fecha ? ` · ${e.ultima ? 'última' : 'más antigua'}: ${e.fecha}${dias}` : ''}`}">
                 <span class="pr-ico"><i class="fa-solid ${ICONOS[e.clave] ?? 'fa-circle'}"></i>${e.pendiente ? '' : '<span class="pr-dot"></span>'}</span>
                 <b>${esc(e.nombre)}</b>
                 <span class="pr-num">${nf.format(e.total)}</span>
                 <small>${esc(rotulo)}</small>
+                ${e.clave === activa ? '<span class="pr-aqui"><i class="fa-solid fa-location-dot"></i>Estás aquí</span>' : ''}
             </li>`;
         }).join('');
 
@@ -56,7 +58,7 @@ export function iniciarProceso({ url, urlDocumentos, getAlcance, onVerAcciones, 
             </div>`;
         }
         const sem = d.semaforo ? `--sv:${d.semaforo.verde};--sa:${d.semaforo.amarillo};--sr:${d.semaforo.rojo}` : '';
-        cont.innerHTML = `<ol class="pr-linea" style="${sem}">${pasos}</ol>${tarjeta.replace('<div class="pr-meta', `<div style="${sem}" class="pr-meta`)}`;
+        cont.innerHTML = `<ol class="pr-linea" style="${sem}">${pasos}</ol>${compacta ? '' : tarjeta.replace('<div class="pr-meta', `<div style="${sem}" class="pr-meta`)}`;
     }
 
     // Clic en una etapa: abre de una vez el seguimiento del primer documento (el más antiguo) y deja la lista de la etapa

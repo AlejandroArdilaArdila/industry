@@ -22,20 +22,24 @@ class SolicitudCorreoIaService
      *
      * @throws IaException
      */
-    public function redactar(object $usuario, object $sol, array $lineas, ?string $base, ?string $instrucciones): array
+    public function redactar(object $usuario, object $sol, array $lineas, ?string $base, ?string $instrucciones, bool $firmaAutomatica = false): array
     {
         $p = DB::getTablePrefix();
         $contacto = DB::selectOne("SELECT TRIM(CONCAT_WS(' ', firstname, lastname)) n FROM {$p}socpeople WHERE rowid = ?", [$sol->contacto_id])->n ?? null;
+        $cli = ! empty($sol->fk_soc) ? DB::selectOne("SELECT tva_intra nit, town FROM {$p}societe WHERE rowid = ?", [$sol->fk_soc]) : null;
         $asesor = DB::selectOne("SELECT TRIM(CONCAT_WS(' ', firstname, lastname)) n FROM {$p}user WHERE rowid = ?", [$usuario->getKey()])->n ?? null;
 
         $contexto = [
             'referencia' => $sol->ref,
             'cliente' => $sol->cliente,
+            'cliente_nit' => $cli->nit ?? null,
+            'cliente_ciudad' => $cli->town ?? null,
             'contacto' => $contacto,
             'asesor' => $asesor,
             'asunto_de_la_solicitud' => trim(strip_tags((string) $sol->asunto)),
             'productos' => array_map(fn ($l) => ['descripcion' => mb_substr((string) $l['description'], 0, 300), 'modelo' => $l['model'] ?? null, 'cantidad' => $l['qty'] ?? null], array_slice($lineas, 0, 40)),
             'texto_base' => $base !== null && trim($base) !== '' ? mb_substr(trim(strip_tags($base)), 0, 4000) : null,
+            'importante' => $firmaAutomatica ? 'La firma del asesor se agrega sola al final del correo: no escribas firma, cargo ni datos de contacto; cierra solo con una despedida breve.' : null,
             'instrucciones_del_asesor' => $instrucciones !== null && trim($instrucciones) !== '' ? mb_substr(trim($instrucciones), 0, 1000) : null,
         ];
 
