@@ -91,7 +91,7 @@ class SolicitudFichaService
     public function datosFicha(?object $sol): array
     {
         if (! $sol) {
-            return ['lineas' => [], 'relacionados' => [], 'contactos' => [], 'historial' => [], 'motivo' => null, 'creador' => null];
+            return ['lineas' => [], 'relacionados' => [], 'contactos' => [], 'historial' => [], 'trazabilidad' => [], 'motivo' => null, 'creador' => null];
         }
         $lineas = DB::select("SELECT l.rowid, l.fk_product, pr.ref producto_ref, pr.label producto_label, l.description, l.model, l.qty
             FROM {$this->p}solicitudes_solicitudline l LEFT JOIN {$this->p}product pr ON pr.rowid = l.fk_product
@@ -111,9 +111,60 @@ class SolicitudFichaService
             'relacionados' => $relacionados,
             'contactos' => $this->contactos((int) $sol->fk_soc),
             'historial' => $historial,
+            'trazabilidad' => $this->trazabilidad($sol),
             'motivo' => $motivo,
             'creador' => $creador,
         ];
+    }
+
+    /**
+     * Línea de tiempo de la solicitud, la más reciente primero: creación, cambios de estado, seguimientos, correos al cliente y a
+     * proveedores, análisis de IA, respuestas del cliente y el próximo contacto programado.
+     *
+     * @return array<int, array{fecha: string, tipo: string, titulo: string, detalle: ?string, usuario: ?string}>
+     */
+    public function trazabilidad(object $sol): array
+    {
+        $id = (int) $sol->rowid;
+        $p = $this->p;
+        $nombre = "CONCAT_WS(' ', u.firstname, u.lastname)";
+        $ev = [];
+        $add = function (?string $fecha, string $tipo, string $titulo, ?string $detalle = null, ?string $usuario = null) use (&$ev) {
+            if ($fecha) {
+                $ev[] = ['fecha' => (string) $fecha, 'tipo' => $tipo, 'titulo' => $titulo, 'detalle' => $detalle !== null && trim($detalle) !== '' ? mb_strimwidth(trim($detalle), 0, 400, '…') : null, 'usuario' => $usuario ?: null];
+            }
+        };
+
+        $creador = DB::selectOne("SELECT $nombre n FROM {$p}user u WHERE u.rowid = ?", [$sol->fk_user_creat])->n ?? null;
+        $add($sol->date_creation, 'creacion', 'Solicitud creada', $sol->asunto ?? null, $creador);
+
+        foreach (DB::select("SELECT h.fecha, h.estado, $nombre usuario FROM {$p}solicitudes_historico_estados h LEFT JOIN {$p}user u ON u.rowid = h.fk_user WHERE h.fk_solicitud = ?", [$id]) as $r) {
+            $add($r->fecha, 'estado', 'Estado: '.$r->estado, null, $r->usuario);
+        }
+        foreach (DB::select("SELECT o.tms, o.mensaje, o.asunto, o.para, $nombre usuario FROM {$p}observaciones_solicitudes o LEFT JOIN {$p}user u ON u.rowid = o.fk_user_creat WHERE o.fk_solicitud = ?", [$id]) as $r) {
+            $add($r->tms, 'seguimiento', 'Seguimiento', ActividadesService::decodificar($r->mensaje), $r->usuario);
+        }
+        foreach (DB::select("SELECT e.tms, e.subject, e.description, $nombre usuario FROM {$p}solicitudes_last_email e LEFT JOIN {$p}user u ON u.rowid = e.fk_user WHERE e.fk_object = ?", [$id]) as $r) {
+            $add($r->tms, 'correo', 'Correo al cliente', trim(($r->subject ?? '').($r->description ? ' · '.$r->description : '')), $r->usuario);
+        }
+        foreach (DB::select("SELECT h.fecha, h.destinatarios, $nombre usuario FROM {$p}solicitudes_historico_envio h LEFT JOIN {$p}user u ON u.rowid = h.fk_user WHERE h.fk_solicitud = ?", [$id]) as $r) {
+            $add($r->fecha, 'proveedores', 'Correo a proveedores', 'Para: '.preg_replace('/\s+/', ' ', (string) $r->destinatarios), $r->usuario);
+        }
+        foreach (DB::select("SELECT a.fecha_analisis, COUNT(*) n, $nombre usuario FROM {$p}solicitudes_analisis_linea a
+            JOIN {$p}solicitudes_solicitudline l ON l.rowid = a.fk_solicitudline LEFT JOIN {$p}user u ON u.rowid = a.fk_user
+            WHERE l.fk_solicitud = ? GROUP BY a.fecha_analisis, usuario", [$id]) as $r) {
+            $add($r->fecha_analisis, 'ia', 'Análisis de IA', $r->n.($r->n == 1 ? ' producto analizado' : ' productos analizados'), $r->usuario);
+        }
+        $add($sol->fecha_reapertura, 'estado', 'Solicitud reabierta');
+        $add($sol->ultima_respuesta, 'respuesta', 'Respuesta del cliente');
+        if ($sol->fecha_proximo_contacto) {
+            $vencido = substr((string) $sol->fecha_proximo_contacto, 0, 10) <= now()->toDateString();
+            $add($sol->fecha_proximo_contacto, $vencido ? 'vencido' : 'proximo', $vencido ? 'Contacto pendiente (vencido)' : 'Próximo contacto programado');
+        }
+
+        usort($ev, fn ($a, $b) => strcmp($b['fecha'], $a['fecha']));
+
+        return array_slice($ev, 0, 200);
     }
 
     // ---------------------------------------------------------------- escritura

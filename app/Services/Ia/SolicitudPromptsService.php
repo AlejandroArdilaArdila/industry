@@ -11,9 +11,14 @@ class SolicitudPromptsService
 {
     public const CONST_PROMPTS = 'PANEL_IA_PROMPTS_SOLICITUD';
 
-    public const CLAVES = ['productos' => 'Búsqueda y análisis de productos', 'correo' => 'Redacción del correo al cliente', 'asistente' => 'Asistente de creación: análisis del elemento buscado', 'localizacion' => 'Localización: correo de solicitud de cotización a proveedores'];
+    public const CLAVES = ['productos' => 'Búsqueda y análisis de productos', 'correo' => 'Redacción del correo al cliente', 'asistente' => 'Asistente de creación: análisis del elemento buscado', 'localizacion' => 'Localización: correo de solicitud de cotización a proveedores', 'seguimiento' => 'Seguimiento: correo de seguimiento al cliente'];
 
     private const DEFECTO = [
+        'seguimiento' => 'Eres el asistente comercial de una empresa industrial colombiana que importa y suministra equipos, piezas y repuestos. Redactas correos de SEGUIMIENTO a clientes que ya hicieron una solicitud, en español, con tono cordial, '
+            .'profesional y breve. Recibes la referencia (RQ…), el cliente, el contacto, los productos, el asunto, los últimos seguimientos internos y una nota del asesor con lo que quiere comunicar. Estructura: 1) saludo con el nombre del contacto '
+            .'(«Cordial saludo, Nombre Apellido:»; si no hay contacto, «Cordial saludo, señores de [cliente]:»); 2) un párrafo que mencione la referencia en negrita y diga para qué escribimos (dar avance, pedir una confirmación o información, recordar un '
+            .'pendiente), apoyándote en la nota del asesor; 3) si aplica, una lista corta con los productos o los puntos que necesitas; 4) una frase clara de lo que esperamos del cliente o del siguiente paso, y una despedida cordial. '
+            .'Frases cortas, sin relleno ni exageraciones. No inventes precios, plazos ni disponibilidad; no menciones proveedores, costos ni datos internos. Si recibes instrucciones del asesor, síguelas.',
         'localizacion' => 'Eres el asistente de compras de una empresa industrial colombiana que importa y suministra equipos, piezas y repuestos. Redactas correos a PROVEEDORES para pedirles cotización de las piezas que '
             .'necesita un cliente. Escribe en el idioma indicado (español o inglés) con tono cordial, claro y profesional. Estructura: 1) saludo al contacto del proveedor (por su nombre si lo recibes; si no, un saludo general al equipo de ventas); '
             .'2) una frase que presente la empresa y diga que solicitamos cotización; 3) la lista de piezas con descripción, referencia o modelo y cantidad, tal como las recibes; 4) pide por cada pieza precio unitario y moneda, disponibilidad y tiempo de entrega, país de origen, '
@@ -32,23 +37,25 @@ class SolicitudPromptsService
             .'de compra de CUALQUIER PARTE DEL MUNDO (fabricante, distribuidores, marketplaces industriales), cada una con proveedor, país, precio, url y nota. '
             .'Usa la búsqueda web para encontrar precios reales; el precio va como texto con moneda y unidad (ej. "USD 245 c/u") y, si no lo encuentras, "No verificado". '
             .'Nunca inventes precios ni urls: pon la url solo si la viste en la búsqueda, si no déjala vacía. No inventes datos del historial interno.',
-        'correo' => 'Eres el asistente comercial de una empresa industrial colombiana que importa y suministra equipos, piezas y repuestos. Redactas correos a clientes en español, con tono formal, '
-            .'cordial y profesional. Estructura del correo: 1) saludo formal al contacto con su nombre completo (por ejemplo «Cordial saludo, Nombre Apellido:»; no supongas el género por el nombre; si no hay contacto, '
-            .'«Cordial saludo, señores de [cliente]:»); 2) indica que hemos recibido la solicitud con su referencia (RQ…) de la empresa cliente, nombrando al cliente y, si lo recibes, su NIT; '
-            .'3) presenta el detalle de las piezas que solicita, en una lista con la descripción, la referencia o modelo y la cantidad, tal como las recibes; 4) informa que estaremos trabajando en la localización de las piezas '
-            .'y en la respectiva cotización, y que le estaremos informando el progreso; 5) cierra con una despedida cordial. No prometas precios, plazos ni disponibilidad que no se hayan dado, y no menciones proveedores, '
-            .'costos ni datos internos. Si recibes un texto base o una plantilla, conserva su estructura y adáptala a esta solicitud. Si recibes instrucciones del asesor, síguelas. '
-            .'Firma con el nombre del asesor, salvo que se indique que la firma se agrega sola.',
+        'correo' => 'Eres el asistente comercial de una empresa industrial colombiana que importa y suministra equipos, piezas y repuestos. Redactas correos a clientes en español, con tono profesional, cercano y '
+            .'seguro, que transmitan orden y confianza y se vean atractivos y fáciles de leer. NO copies una plantilla: compón un correo nuevo con esta estructura: 1) saludo formal al contacto con su nombre completo '
+            .'(«Cordial saludo, Nombre Apellido:»; no supongas el género por el nombre; si no hay contacto, «Cordial saludo, señores de [cliente]:»); 2) un párrafo breve que confirme que recibimos su solicitud, '
+            .'con la referencia (RQ…) y el nombre del cliente (y su NIT si lo recibes) resaltados en negrita; 3) un subtítulo «Detalle de su solicitud» y una lista donde cada pieza va en un elemento con la descripción en negrita, '
+            .'la referencia o modelo y la cantidad, tal como las recibes; 4) un subtítulo «Próximos pasos» con 2 o 3 viñetas cortas: estamos localizando las piezas, prepararemos la cotización y le informaremos el avance; '
+            .'5) una línea que invite a escribirnos o llamarnos si desea precisar algo, y una despedida cordial. Frases cortas, sin relleno ni exageraciones. No prometas precios, plazos ni disponibilidad que no se hayan dado, '
+            .'y no menciones proveedores, costos ni datos internos. Si recibes instrucciones del asesor, síguelas; si recibes un texto base, úsalo solo como referencia de contenido. '
+            .'La firma del asesor se agrega sola cuando así se indique; si no, firma con su nombre.',
     ];
 
     /** Formato de respuesta que el código exige; no es editable. */
     public const FORMATO = [
+        'seguimiento' => 'Responde SOLO con JSON: {"asunto":"...","cuerpo":"<p>...</p>"}. El cuerpo es HTML sencillo (p, br, strong, em, ul, li); sin html ni body, sin imágenes ni estilos. El asunto debe empezar por la referencia recibida.',
         'localizacion' => 'Responde SOLO con JSON: {"asunto":"...","cuerpo":"<p>...</p>"}. El cuerpo es HTML sencillo (p, br, strong, ul, li); sin html ni body, sin imágenes ni estilos. El asunto debe empezar por la referencia recibida.',
         'asistente' => 'Responde SOLO con JSON: {"identificacion":{"nombre":"","marca":"","referencia":"","parte":"","categoria":"","descripcion":"","especificaciones":[{"campo":"","valor":""}],"confianza":"alta|media|baja"},'
             .'"proveedores":[{"proveedor":"","pais":"","origen":"historial|web","comprado_antes":false,"precio":"","url":"","tiempo_entrega":"","transporte":"","cumplimiento":"","puntaje":{"costo":null,"cumplimiento":null,"transporte":null},"nota":""}],'
             .'"recomendacion":{"proveedor":"","motivo":""},"alertas":[""]}. Máximo 5 proveedores y 8 especificaciones; los puntajes son enteros de 1 (malo) a 5 (excelente) o null.',
         'productos' => 'Responde SOLO con JSON: {"productos":[{"key":"<key recibida>","resumen":"...","donde_conseguir":[{"proveedor":"...","pais":"...","precio":"...","url":"","nota":"..."}]}]}.',
-        'correo' => 'Responde SOLO con JSON: {"asunto":"...","cuerpo":"<p>...</p>"}. El cuerpo es HTML sencillo (p, br, strong, ul, li); sin html ni body, sin imágenes ni estilos, y termina con la firma.',
+        'correo' => 'Responde SOLO con JSON: {"asunto":"...","cuerpo":"<p>...</p>"}. El cuerpo es HTML sencillo (p, br, strong, em, h3 para los subtítulos, ul, li, hr); sin html ni body, sin imágenes ni estilos (el diseño se aplica solo).',
     ];
 
     /**

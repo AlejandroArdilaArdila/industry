@@ -278,7 +278,7 @@
             {{-- ---------- 4. Estado ---------- --}}
             @unless ($esNuevo)
                 <form data-step="estado" class="hidden min-h-full flex-col p-5 sm:p-7" onsubmit="return false">
-                    @include('panel.partials.ficha._paso-header', ['titulo' => 'Estado', 'descripcion' => 'Cierra o reabre la solicitud y consulta su historial.'])
+                    @include('panel.partials.ficha._paso-header', ['titulo' => 'Estado', 'descripcion' => 'Cierra o reabre la solicitud y consulta la trazabilidad de la solicitud.'])
 
                     <div class="rounded-xl border border-border bg-muted/30 p-4">
                         <div class="flex flex-wrap items-center gap-3">
@@ -309,16 +309,37 @@
                         @endif
                     </div>
 
-                    <h4 class="mt-6 mb-2 text-sm font-semibold text-foreground">Historial de estados</h4>
-                    <ol class="space-y-2">
-                        @forelse ($historial as $h)
-                            <li class="flex items-center gap-3 rounded-lg border border-border px-3 py-2 text-sm">
-                                <i class="fa-solid fa-circle-dot text-primary"></i>
-                                <span class="font-medium text-foreground">{{ $h->estado }}</span>
-                                <span class="ml-auto text-xs text-muted-foreground">{{ \Illuminate\Support\Carbon::parse($h->fecha)->format('d/m/Y H:i') }}@if ($h->usuario) · {{ $h->usuario }}@endif</span>
+                    @php
+                        $tipos = [
+                            'creacion' => ['fa-circle-plus', 'text-emerald-600 bg-emerald-500/15'],
+                            'estado' => ['fa-right-left', 'text-primary bg-primary/15'],
+                            'seguimiento' => ['fa-comment-dots', 'text-sky-600 bg-sky-500/15'],
+                            'correo' => ['fa-envelope', 'text-violet-600 bg-violet-500/15'],
+                            'proveedores' => ['fa-paper-plane', 'text-amber-600 bg-amber-500/15'],
+                            'ia' => ['fa-wand-magic-sparkles', 'text-fuchsia-600 bg-fuchsia-500/15'],
+                            'respuesta' => ['fa-reply', 'text-teal-600 bg-teal-500/15'],
+                            'proximo' => ['fa-calendar-day', 'text-muted-foreground bg-muted'],
+                            'vencido' => ['fa-bell', 'text-rose-600 bg-rose-500/15'],
+                        ];
+                    @endphp
+                    <h4 class="mt-6 mb-3 text-sm font-semibold text-foreground">Trazabilidad <span class="font-normal text-muted-foreground">· {{ count($trazabilidad) }} eventos</span></h4>
+                    <ol class="relative space-y-3 before:absolute before:bottom-2 before:left-[15px] before:top-2 before:w-px before:bg-border">
+                        @forelse ($trazabilidad as $e)
+                            @php [$ico, $col] = $tipos[$e['tipo']] ?? $tipos['estado']; @endphp
+                            <li class="relative flex gap-3">
+                                <span class="z-10 grid h-8 w-8 flex-shrink-0 place-items-center rounded-full text-xs {{ $col }}"><i class="fa-solid {{ $ico }}"></i></span>
+                                <div class="min-w-0 flex-1 rounded-lg border border-border px-3 py-2 text-sm">
+                                    <div class="flex flex-wrap items-baseline gap-x-2">
+                                        <span class="font-medium text-foreground">{{ $e['titulo'] }}</span>
+                                        <span class="ml-auto text-xs text-muted-foreground">{{ \Illuminate\Support\Carbon::parse($e['fecha'])->format(strlen($e['fecha']) > 10 ? 'd/m/Y H:i' : 'd/m/Y') }}@if ($e['usuario']) · {{ $e['usuario'] }}@endif</span>
+                                    </div>
+                                    @if ($e['detalle'])
+                                        <p class="mt-0.5 whitespace-pre-line break-words text-xs text-muted-foreground">{{ $e['detalle'] }}</p>
+                                    @endif
+                                </div>
                             </li>
                         @empty
-                            <li class="text-sm text-muted-foreground">Sin movimientos registrados.</li>
+                            <li class="text-sm text-muted-foreground">Sin eventos registrados.</li>
                         @endforelse
                     </ol>
 

@@ -6,6 +6,7 @@ import '../../css/solicitudes-tablero.css';
 import Swal from 'sweetalert2';
 import { toast } from '../panel/ficha-modal.js';
 import { esc } from '../panel/dashboard-util.js';
+import { seguimientoSolicitud } from './solicitud-seguimiento.js';
 
 const MORA = {
     verde: { txt: 'Al día', hasta: 15 },
@@ -30,7 +31,7 @@ const ETAPAS = { activas: [1, 2, 3, 4, 5, 6], proceso: [2, 3, 4, 6], cotizacione
 export function iniciarTablero({ raiz, config, csrfToken, ficha, panel, onCambio }) {
     const columnas = config.tablero.columnas;
     const estado = {}; // clave => { items, total, cargando }
-    const filtros = { q: '', estados: [] };
+    const filtros = { q: '', estados: [], desde: '', hasta: '' };
     let grupo = []; // estados que dejan las tarjetas de estadísticas ('' = todos)
     let motivos = null;
     let arrastrada = null;
@@ -68,28 +69,31 @@ export function iniciarTablero({ raiz, config, csrfToken, ficha, panel, onCambio
         const nivel = nivelMora(s.mora);
         const vencido = s.contactoVencido;
         const ultimo = s.ultimoSeguimiento;
-        return `<article class="kb-card mora-${nivel}" draggable="true" data-id="${s.id}">
-            <div class="kb-card-top">
-                <a href="#" class="kb-ref" data-acc="editar" title="Abrir la solicitud"><i class="fa-solid fa-inbox"></i>${esc(s.ref)}</a>
-                <span class="kb-mora" title="Días desde la creación">${esc(MORA[nivel].txt)} · ${s.mora} d</span>
+        const colorEstado = COLOR_ESTADO[s.estado] ?? '#64748b';
+        const prox = s.proximoContacto ? (vencido ? `Contactar · ${fechaCorta(s.proximoContacto)}` : fechaCorta(s.proximoContacto)) : 'Sin programar';
+        return `<article class="kb-card sol mora-${nivel}" draggable="true" data-id="${s.id}">
+            <div class="sol-hdr">
+                <a href="#" class="sol-id" data-acc="editar" title="Abrir la solicitud">${esc(s.ref)}</a>
+                <span class="sol-badge" title="Días desde la creación">${esc(MORA[nivel].txt)}</span>
                 <button type="button" class="kb-mas" data-acc="menu" title="Más acciones" aria-label="Más acciones"><i class="fa-solid fa-ellipsis-vertical"></i></button>
             </div>
-            <div class="kb-cliente"><i class="fa-solid fa-building"></i><span>${esc(s.cliente || 'Sin cliente')}</span></div>
-            <p class="kb-asunto" title="${esc(s.asunto)}">${esc(s.asunto) || '<em>Sin asunto</em>'}</p>
-            <div class="kb-meta">
-                <span class="kb-chip estado" style="--e:${COLOR_ESTADO[s.estado] ?? '#64748b'}" title="Estado de la solicitud">${esc(s.estadoNombre)}</span>
-                ${s.productos ? `<span class="kb-chip" title="Productos"><i class="fa-solid fa-box"></i>${s.productos}</span>` : ''}
-                <span class="kb-chip ${s.correoEnviado ? 'ok' : ''}" title="${s.correoEnviado ? 'Correo enviado al cliente' : 'Aún sin correo al cliente'}"><i class="fa-solid ${s.correoEnviado ? 'fa-envelope-circle-check' : 'fa-envelope'}"></i></span>
-                ${s.ultimaRespuesta ? `<span class="kb-chip" title="Última respuesta"><i class="fa-solid fa-reply"></i>${fechaCorta(s.ultimaRespuesta)}</span>` : ''}
+            <div class="sol-cli" title="${esc(s.cliente || '')}">${esc(s.cliente || 'Sin cliente')}</div>
+            <div class="sol-desc" title="${esc(s.asunto)}">${esc(s.asunto) || '<em>Sin asunto</em>'}</div>
+            <div class="sol-grid">
+                <div class="sol-tag" title="Estado de la solicitud"><div class="lbl">Estado</div><div class="val" style="color:${colorEstado}"><span class="dot" style="background:${colorEstado}"></span>${esc(s.estadoNombre)}</div></div>
+                <div class="sol-tag" title="Próximo contacto"><div class="lbl">Próx. contacto</div><div class="val ${vencido ? 'crit' : ''}"><span class="dot" style="background:${vencido ? 'var(--rojo)' : 'var(--muted-foreground)'}"></span>${prox}</div></div>
             </div>
-            ${ultimo ? `<p class="kb-seg" title="${esc(ultimo.texto)}"><i class="fa-solid fa-comment-dots"></i><span>${esc(ultimo.texto)}</span>${ultimo.fecha ? `<time>${fechaCorta(ultimo.fecha)}</time>` : ''}</p>` : '<p class="kb-seg vacio"><i class="fa-regular fa-comment"></i><span>Sin seguimientos</span></p>'}
-            <footer class="kb-pie">
-                <span class="kb-avatar" title="${esc(s.creador || '')}">${esc(iniciales(s.creador))}</span>
-                <span class="kb-prox ${vencido ? 'vencido' : ''}" title="Próximo contacto">
-                    <i class="fa-regular ${vencido ? 'fa-bell' : 'fa-calendar'}"></i>${s.proximoContacto ? (vencido ? `Contactar · ${fechaCorta(s.proximoContacto)}` : fechaCorta(s.proximoContacto)) : 'Sin programar'}
-                </span>
+            <div class="sol-mora">
+                <span class="lbl">MORA TOTAL <small>desde ingreso</small></span>
+                <span class="val">${s.mora} <small>días</small></span>
+            </div>
+            <div class="sol-ft">
+                <span class="sol-resp" title="${esc(s.creador || '')}">&#128100; ${esc(s.creador || '—')}</span>
+                ${s.productos ? `<span class="sol-mini" title="Productos"><i class="fa-solid fa-box"></i>${s.productos}</span>` : ''}
+                <span class="sol-mini ${s.correoEnviado ? 'ok' : ''}" title="${s.correoEnviado ? 'Correo enviado al cliente' : 'Aún sin correo al cliente'}"><i class="fa-solid ${s.correoEnviado ? 'fa-envelope-circle-check' : 'fa-envelope'}"></i></span>
                 <button type="button" class="kb-seguir" data-acc="seguimiento" title="Registrar seguimiento"><i class="fa-solid fa-comment-medical"></i>Seguimiento</button>
-            </footer>
+            </div>
+            ${ultimo ? `<div class="sol-seg" title="${esc(ultimo.texto)}">&#128204; ${ultimo.fecha ? `<b>${fechaCorta(ultimo.fecha)}</b> · ` : ''}${esc(ultimo.texto)}</div>` : '<div class="sol-seg sin">&#128204; Sin seguimiento</div>'}
         </article>`;
     }
 
@@ -106,7 +110,7 @@ export function iniciarTablero({ raiz, config, csrfToken, ficha, panel, onCambio
         lista.innerHTML = e.items.length
             ? e.items.map(tarjeta).join('') + (e.items.length < e.total
                 ? `<button type="button" class="kb-mas-items" data-acc="mas">${e.cargando ? 'Cargando…' : `Ver más (${e.total - e.items.length})`}</button>` : '')
-            : `<div class="kb-vacio"><i class="fa-solid ${def.icono}"></i><span>${filtros.q || filtros.estados.length ? 'Nada con esos filtros' : 'Sin solicitudes'}</span></div>`;
+            : `<div class="kb-vacio"><i class="fa-solid ${def.icono}"></i><span>${filtros.q || filtros.estados.length || filtros.desde || filtros.hasta ? 'Nada con esos filtros' : 'Sin solicitudes'}</span></div>`;
     }
 
     async function cargar(clave, mas = false) {
@@ -118,6 +122,8 @@ export function iniciarTablero({ raiz, config, csrfToken, ficha, panel, onCambio
         const p = new URLSearchParams();
         if (filtros.q) p.set('q', filtros.q);
         if (filtros.estados.length) p.set('estados', filtros.estados.join(','));
+        if (filtros.desde) p.set('desde', filtros.desde);
+        if (filtros.hasta) p.set('hasta', filtros.hasta);
         if (mas) p.set('skip', e.items.length);
         try {
             const r = await pedir(`${config.tablero.columnaUrl.replace('__COL__', clave)}?${p}`);
@@ -283,48 +289,10 @@ export function iniciarTablero({ raiz, config, csrfToken, ficha, panel, onCambio
         });
     }
 
-    /** Observación + próximo contacto en un solo paso, sin salir del tablero. */
+    /** Seguimiento completo (bitácora, próximo contacto y correo con IA) en un diálogo. */
     function seguimientoRapido(ancla, s, origen) {
-        const f = flotante(ancla, `
-            <form class="kb-form">
-                <b>Seguimiento · ${esc(s.ref)}</b>
-                <textarea name="observacion" rows="3" maxlength="5000" placeholder="¿Qué pasó con el cliente?" required></textarea>
-                <small>Próximo contacto</small>
-                <div class="kb-dias">
-                    <button type="button" data-dias="">Sin fecha</button><button type="button" data-dias="1">Mañana</button>
-                    <button type="button" data-dias="3">3 días</button><button type="button" data-dias="7">1 semana</button>
-                </div>
-                <input type="date" name="fecha" min="${sumarDias(0)}">
-                <div class="kb-form-pie"><button type="button" data-cancelar>Cancelar</button><button type="submit">Guardar</button></div>
-            </form>`);
-        const form = f.querySelector('form');
-        const fecha = form.elements.fecha;
-        form.querySelector('textarea').focus();
-        f.querySelectorAll('[data-dias]').forEach((b) => b.addEventListener('click', () => {
-            fecha.value = b.dataset.dias === '' ? '' : sumarDias(Number(b.dataset.dias));
-            f.querySelectorAll('[data-dias]').forEach((x) => x.classList.toggle('on', x === b));
-        }));
-        f.querySelector('[data-cancelar]').addEventListener('click', cerrarFlotantes);
-        form.addEventListener('submit', async (ev) => {
-            ev.preventDefault();
-            const obs = form.elements.observacion.value.trim();
-            if (!obs) return;
-            const envio = form.querySelector('[type=submit]');
-            envio.disabled = true;
-            try {
-                const r = await pedir(config.tablero.seguimientoUrl, 'POST', {
-                    modulo: 'solicitud', id: s.id, observacion: obs,
-                    ...(fecha.value ? { programar: true, fecha: fecha.value, hora: '08:00', titulo: `Seguimiento ${s.ref}` } : {}),
-                });
-                cerrarFlotantes();
-                toast.fire({ icon: 'success', title: r.message });
-                cargar(origen);
-                onCambio?.();
-            } catch (err) {
-                envio.disabled = false;
-                toast.fire({ icon: 'error', title: err.message });
-            }
-        });
+        cerrarFlotantes();
+        seguimientoSolicitud({ id: s.id, ref: s.ref, cliente: s.cliente, onGuardado: () => { cargar(origen); onCambio?.(); } });
     }
 
     cuerpo.addEventListener('click', (ev) => {
@@ -358,6 +326,84 @@ export function iniciarTablero({ raiz, config, csrfToken, ficha, panel, onCambio
     const selEstado = raiz.querySelector('[data-kb-estado]');
     const aplicarEstados = () => { filtros.estados = selEstado.value ? [Number(selEstado.value)] : grupo; cargarTodas(); };
     selEstado.addEventListener('change', aplicarEstados);
+
+    // Fecha de creación: Todo, último mes, 3 o 6 meses, o un rango propio.
+    const grupoFechas = raiz.querySelector('[data-kb-fechas]');
+    const cajaRango = raiz.querySelector('[data-kb-rango]');
+    const inDesde = raiz.querySelector('[data-kb-desde]');
+    const inHasta = raiz.querySelector('[data-kb-hasta]');
+    const iso = (d) => new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+    const aplicarRango = () => { filtros.desde = inDesde.value; filtros.hasta = inHasta.value; cargarTodas(); };
+    grupoFechas.addEventListener('click', (ev) => {
+        const b = ev.target.closest('[data-rango]');
+        if (!b) return;
+        grupoFechas.querySelectorAll('button').forEach((x) => x.classList.toggle('on', x === b));
+        const v = b.dataset.rango;
+        cajaRango.hidden = v !== 'rango';
+        if (v === 'rango') { inDesde.focus(); aplicarRango(); return; }
+        if (v) { const d = new Date(); d.setMonth(d.getMonth() - Number(v)); filtros.desde = iso(d); } else filtros.desde = '';
+        filtros.hasta = '';
+        cargarTodas();
+    });
+    inDesde.addEventListener('change', aplicarRango);
+    inHasta.addEventListener('change', aplicarRango);
+
+    // Configuración de las columnas (administradores): título, estados y condiciones de cada grupo; cae en la primera que cumple.
+    raiz.querySelector('[data-kb-config]')?.addEventListener('click', async () => {
+        const filas = config.tablero.columnas.map((c) => ({ ...c }));
+        const num = (v) => (v === null || v === undefined ? '' : v);
+        const pintarFila = (c, i) => `<fieldset class="kb-cfg-col" data-i="${i}" data-clave="${c.clave}" style="--c:${c.color}">
+            <legend><span class="kb-cfg-n">${i + 1}</span><input type="text" data-f="titulo" value="${esc(c.titulo)}" maxlength="40" aria-label="Nombre del grupo">
+                <button type="button" data-mv="-1" title="Subir (tiene prioridad)"${i === 0 ? ' disabled' : ''}><i class="fa-solid fa-arrow-up"></i></button>
+                <button type="button" data-mv="1" title="Bajar"${i === filas.length - 1 ? ' disabled' : ''}><i class="fa-solid fa-arrow-down"></i></button></legend>
+            <div class="kb-cfg-fila"><label>Mora desde (días)<input type="number" min="0" data-f="moraMin" value="${num(c.moraMin)}" placeholder="sin mínimo"></label>
+                <label>Mora hasta (días)<input type="number" min="0" data-f="moraMax" value="${num(c.moraMax)}" placeholder="sin máximo"></label>
+                <label>Próximo contacto<select data-f="contacto">
+                    ${[['cualquiera', 'Cualquiera'], ['vencido', 'Vencido o para hoy'], ['no_vencido', 'Sin vencer']].map(([v, n]) => `<option value="${v}"${c.contacto === v ? ' selected' : ''}>${n}</option>`).join('')}
+                </select></label></div>
+            <div class="kb-cfg-est"><span>Estados (ninguno = todos):</span>${config.tablero.estadosTablero.map((e) => `<label><input type="checkbox" data-est="${e.id}"${c.estados.includes(e.id) ? ' checked' : ''}>${esc(e.nombre)}</label>`).join('')}</div>
+        </fieldset>`;
+        const leer = (cont) => [...cont.querySelectorAll('.kb-cfg-col')].map((f) => ({
+            clave: f.dataset.clave,
+            color: filas.find((x) => x.clave === f.dataset.clave).color,
+            titulo: f.querySelector('[data-f=titulo]').value.trim(),
+            moraMin: f.querySelector('[data-f=moraMin]').value,
+            moraMax: f.querySelector('[data-f=moraMax]').value,
+            contacto: f.querySelector('[data-f=contacto]').value,
+            estados: [...f.querySelectorAll('[data-est]:checked')].map((x) => Number(x.dataset.est)),
+        }));
+        const r = await Swal.fire({
+            title: 'Configurar columnas',
+            width: 760,
+            showCancelButton: true,
+            confirmButtonText: 'Guardar',
+            cancelButtonText: 'Cancelar',
+            showDenyButton: true,
+            denyButtonText: 'Restablecer',
+            html: `<p class="kb-cfg-ayuda">Cada solicitud cae en la <b>primera</b> columna (de arriba abajo) cuyas condiciones cumple. Usa las flechas para dar prioridad.</p><div class="kb-cfg" data-cfg>${filas.map(pintarFila).join('')}</div>`,
+            didOpen: (el) => {
+                const cont = el.querySelector('[data-cfg]');
+                cont.addEventListener('click', (ev) => {
+                    const b = ev.target.closest('[data-mv]');
+                    if (!b) return;
+                    const actual = leer(cont);
+                    const i = Number(b.closest('.kb-cfg-col').dataset.i);
+                    const j = i + Number(b.dataset.mv);
+                    [actual[i], actual[j]] = [actual[j], actual[i]];
+                    filas.splice(0, filas.length, ...actual.map((x) => ({ ...x, estados: x.estados })));
+                    cont.innerHTML = filas.map(pintarFila).join('');
+                });
+            },
+            preConfirm: () => leer(Swal.getHtmlContainer().querySelector('[data-cfg]')),
+        });
+        if (r.isDismissed) return;
+        try {
+            await pedir(config.tablero.columnasUrl, 'PUT', { columnas: r.isDenied ? ['atrasadas', 'atencion', 'contactar', 'aldia'].map((k) => ({ clave: k })) : r.value });
+            location.reload();
+        } catch (err) {
+            toast.fire({ icon: 'error', title: err.message });
+        }
+    });
 
     let iniciado = false;
     return {

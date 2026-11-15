@@ -25,7 +25,7 @@ class UsuarioEditController extends Controller
     private const SECCIONES = [
         'datos' => ['firstname', 'lastname', 'civility', 'gender', 'birth', 'email', 'job', 'office_phone', 'user_mobile'],
         'ubicacion' => ['address', 'town', 'zip', 'fk_state', 'fk_country'],
-        'acceso' => ['statut', 'admin', 'employee'],
+        'acceso' => ['login', 'statut', 'admin', 'employee'],
         'adicionales' => [],
     ];
 
@@ -36,13 +36,15 @@ class UsuarioEditController extends Controller
         'min' => 'El campo :attribute debe tener al menos :min caracteres.',
         'date' => 'El campo :attribute no es una fecha válida.',
         'integer' => 'El campo :attribute debe ser un número entero.',
+        'regex' => 'El campo :attribute solo admite letras, números y . _ @ -',
+        'unique' => 'Ese :attribute ya está en uso.',
         'in' => 'El valor de :attribute no es válido.',
         'confirmed' => 'La confirmación de la contraseña no coincide.',
     ];
 
     private const ATRIBUTOS = [
         'firstname' => 'nombres', 'lastname' => 'apellidos', 'email' => 'correo', 'job' => 'cargo',
-        'birth' => 'fecha de nacimiento', 'password' => 'contraseña',
+        'birth' => 'fecha de nacimiento', 'login' => 'usuario', 'password' => 'contraseña',
     ];
 
     public function __construct(
@@ -107,6 +109,12 @@ class UsuarioEditController extends Controller
             $this->perfilService->reglasDatosPersonales(true, $usuario->rowid),
             array_flip(self::SECCIONES[$seccion])
         );
+        if ($seccion === 'acceso') {
+            $reglas['login'] = [
+                'required', 'string', 'min:3', 'max:50', 'regex:/^[A-Za-z0-9._@\-]+$/',
+                Rule::unique('mysql.user', 'login')->ignore($usuario->rowid, 'rowid')->where('entity', $usuario->entity),
+            ];
+        }
         $datos = $request->validate($reglas, self::MENSAJES, self::ATRIBUTOS);
 
         // Un admin no puede quitarse a sí mismo el acceso desde aquí.
@@ -156,6 +164,7 @@ class UsuarioEditController extends Controller
             'usuario' => [
                 'rowid' => (int) $usuario->rowid,
                 'nombre' => $usuario->full_name ?: $usuario->login,
+                'login' => (string) $usuario->login,
                 'statut' => (string) $usuario->statut,
                 'admin' => (string) $usuario->admin,
             ],

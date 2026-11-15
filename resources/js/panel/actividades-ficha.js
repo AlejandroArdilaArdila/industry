@@ -4,6 +4,8 @@ import Swal from 'sweetalert2';
 import { FichaModal, toast } from './ficha-modal.js';
 import { abrirResumenMeses } from './cliente-resumen.js';
 import { esc, dineroCorto, isoLocal, COLORES_CARD } from './dashboard-util.js';
+import { seguimientoSolicitud } from '../solicitudes/solicitud-seguimiento.js';
+import { iniciarTareaForm, iniciarTareaDetalle, guardarTarea } from './tarea-form.js';
 
 export class ActividadFichaModal extends FichaModal {
     constructor(opts) {
@@ -20,19 +22,40 @@ export class ActividadFichaModal extends FichaModal {
         return this.cargar(`${this.opts.panelUrl}?${new URLSearchParams({ modulo, id, fijo: fijo ? 1 : 0 })}`);
     }
 
-    /** Abre el panel para programar una actividad: primero se elige el documento. */
-    abrirNueva(conLista = false) {
-        if (!conLista) this.lista = null;
+    /**
+     * «Programar»: abre el formulario de nueva tarea (libre o relacionada con cualquier elemento). `previo` = {tipo, id} para
+     * llegar ya relacionada; `fecha` (Y-m-d) = día elegido en el calendario. Con conLista=true (desde «Cambiar documento») va a la búsqueda de documentos del seguimiento.
+     */
+    abrirNueva(conLista = false, previo = null, fecha = null) {
         this.fijo = false;
-        return this.cargar(this.opts.panelUrl);
+        if (conLista === true) return this.cargar(this.opts.panelUrl);
+        this.lista = null;
+        const p = new URLSearchParams();
+        if (previo) { p.set('tipo', previo.tipo); p.set('ref', previo.id); }
+        if (fecha) p.set('fecha', fecha); // día elegido en el calendario del programador
+        return this.cargar(this.opts.tareaFormUrl + (p.size ? `?${p}` : ''));
     }
 
-    tituloPaso() {
-        return 'el seguimiento';
+    /** Detalle de una tarea: completar, posponer, ver a qué está ligada. */
+    abrirTarea(id) {
+        this.fijo = false;
+        return this.cargar(this.opts.tareaShowUrl.replace('__ID__', id));
+    }
+
+    /** Mientras se guarda una tarea no se puede cerrar el panel (Esc, clic fuera o botón). */
+    async cerrar(forzar = false) {
+        if (this.guardando) return;
+        await super.cerrar(forzar);
+    }
+
+    tituloPaso(paso) {
+        return paso === 'tarea' ? 'la tarea' : 'el seguimiento';
     }
 
     inicializarExtras() {
-        if (this.root.querySelector('[data-buscar-q]')) this.iniciarBusqueda();
+        if (this.root.hasAttribute('data-tarea-form')) iniciarTareaForm(this);
+        else if (this.root.dataset.tareaDetalle) iniciarTareaDetalle(this);
+        else if (this.root.querySelector('[data-buscar-q]')) this.iniciarBusqueda();
         else this.iniciarSeguimiento();
     }
 
@@ -175,6 +198,12 @@ export class ActividadFichaModal extends FichaModal {
         this.iniciarResumenCliente(form);
         this.iniciarPestanas(form);
         this.iniciarNavegacion(form);
+        // Solicitudes: seguimiento estándar (el mismo diálogo del tablero); al guardar se recarga el historial.
+        const estandar = form.querySelector('[data-seg-estandar]');
+        estandar?.addEventListener('click', () => seguimientoSolicitud({
+            id: Number(estandar.dataset.id), ref: estandar.dataset.ref,
+            onGuardado: async (json) => { this.opts.onSaved?.(json); await this.abrirDocumento(form.dataset.modulo, form.dataset.id, this.fijo); },
+        }));
         const programar = form.querySelector('[data-programar]');
         const caja = form.querySelector('[data-recordatorio]');
         const fecha = form.querySelector('#act_fecha');
@@ -196,13 +225,24 @@ export class ActividadFichaModal extends FichaModal {
             fecha.dispatchEvent(new Event('change', { bubbles: true }));
             marcarAtajo();
         }));
-        fecha.addEventListener('change', marcarAtajo);
-        programar.addEventListener('change', alternar);
-        atajos[0]?.click();
-        alternar();
+        if (fecha && programar) {
+            fecha.addEventListener('change', marcarAtajo);
+            programar.addEventListener('change', alternar);
+            atajos[0]?.click();
+            alternar();
+        }
 
         this.root.querySelector('[data-cambiar-doc]')?.addEventListener('click', () => {
             this.abrirNueva(true);
+        });
+
+        // Documentos relacionados: abrir el documento elegido (vuelve a la pestaña de sus datos).
+        form.addEventListener('click', (e) => {
+            const d = e.target.closest('[data-rel-doc]');
+            if (!d) return;
+            const [m, id] = d.dataset.relDoc.split(':');
+            this.tabActiva = 'documento';
+            this.abrirDocumento(m, id, this.fijo);
         });
 
         // Marcar un recordatorio pendiente como realizado, sin recargar el panel (no pierde lo escrito).
@@ -253,6 +293,7 @@ export class ActividadFichaModal extends FichaModal {
     // ------------------------------------------------------------ guardar
 
     async guardar(form) {
+        if (form.dataset.step === 'tarea') return guardarTarea(this, form);
         if (form.dataset.step !== 'seguimiento') return;
         const boton = form.querySelector('[data-step-save]');
         const programar = form.querySelector('[data-programar]').checked;

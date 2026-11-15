@@ -6,7 +6,9 @@ use App\Http\Controllers\Panel\Categorias\CategoriasGridController;
 use App\Http\Controllers\Panel\Categorias\CategoriasPageController;
 use App\Http\Controllers\Panel\PanelAuthController;
 use App\Http\Controllers\Panel\ActividadesController;
+use App\Http\Controllers\Panel\MicrosoftController;
 use App\Http\Controllers\Panel\PanelDashboardController;
+use App\Http\Controllers\Panel\TareasController;
 use App\Http\Controllers\Panel\TrmController;
 use App\Http\Controllers\Panel\Facturas\FacturasGridController;
 use App\Http\Controllers\Panel\Facturas\FacturasPageController;
@@ -42,6 +44,8 @@ if (! config('app.panel_enabled')) {
     return;
 }
 
+Route::post('/microsoft/webhook', [MicrosoftController::class, 'webhook'])->name('microsoft.webhook');
+
 Route::middleware('guest:web')->group(function () {
     Route::get('/', [PanelAuthController::class, 'showLogin'])->name('login');
     Route::post('/login', [PanelAuthController::class, 'login'])->name('login.submit');
@@ -57,6 +61,29 @@ Route::prefix('panel')->name('panel.')->middleware('auth:web')->group(function (
     Route::get('/dashboard/proceso', [PanelDashboardController::class, 'proceso'])->name('dashboard.proceso');
     Route::get('/dashboard/proceso/{etapa}/documentos', [PanelDashboardController::class, 'procesoDocumentos'])->where('etapa', '[a-z]+')->name('dashboard.proceso.documentos');
     Route::get('/dashboard/leyenda', [PanelDashboardController::class, 'leyenda'])->name('dashboard.leyenda');
+
+    // La URL de redirección registrada en Azure (MS_REDIRECT_URI) es esta.
+    Route::get('/integraciones/microsoft/callback', [MicrosoftController::class, 'callback'])->name('microsoft.callback');
+
+    Route::prefix('microsoft')->name('microsoft.')->group(function () {
+        Route::get('/estado', [MicrosoftController::class, 'estado'])->name('estado');
+        Route::get('/eventos', [MicrosoftController::class, 'eventos'])->name('eventos');
+        Route::get('/conectar', [MicrosoftController::class, 'conectar'])->name('conectar');
+        Route::put('/preferencias', [MicrosoftController::class, 'preferencias'])->name('preferencias');
+        Route::post('/sincronizar', [MicrosoftController::class, 'sincronizar'])->name('sincronizar');
+        Route::delete('/', [MicrosoftController::class, 'desconectar'])->name('desconectar');
+    });
+
+    Route::prefix('tareas')->name('tareas.')->group(function () {
+        Route::get('/formulario', [TareasController::class, 'formulario'])->name('formulario');
+        Route::get('/elementos', [TareasController::class, 'elementos'])->name('elementos');
+        Route::post('/interpretar', [TareasController::class, 'interpretar'])->name('interpretar');
+        Route::post('/', [TareasController::class, 'store'])->name('store');
+        Route::get('/{tarea}', [TareasController::class, 'show'])->whereNumber('tarea')->name('show');
+        Route::delete('/{tarea}', [TareasController::class, 'destroy'])->whereNumber('tarea')->name('destroy');
+        Route::put('/{tarea}/estado', [TareasController::class, 'estado'])->whereNumber('tarea')->name('estado');
+        Route::put('/{tarea}/posponer', [TareasController::class, 'posponer'])->whereNumber('tarea')->name('posponer');
+    });
 
     Route::prefix('actividades')->name('actividades.')->group(function () {
         Route::get('/', [ActividadesController::class, 'index'])->name('index');
@@ -84,6 +111,7 @@ Route::prefix('panel')->name('panel.')->middleware('auth:web')->group(function (
         Route::get('/asistente/prompt', [SolicitudAsistenteController::class, 'prompt'])->name('asistente.prompt');
         Route::put('/asistente/prompt', [SolicitudAsistenteController::class, 'guardarPrompt'])->name('asistente.prompt.guardar');
         Route::get('/tablero/motivos', [SolicitudesTableroController::class, 'motivos'])->name('tablero.motivos');
+        Route::put('/tablero/columnas', [SolicitudesTableroController::class, 'guardarColumnas'])->name('tablero.columnas.guardar');
         Route::get('/tablero/{columna}', [SolicitudesTableroController::class, 'columna'])->where('columna', '[a-z]+')->name('tablero.columna');
         Route::post('/{solicitud}/mover', [SolicitudesTableroController::class, 'mover'])->whereNumber('solicitud')->name('mover');
         Route::post('/export/xlsx', [SolicitudesGridController::class, 'exportXlsx'])->name('export.xlsx');
@@ -98,6 +126,9 @@ Route::prefix('panel')->name('panel.')->middleware('auth:web')->group(function (
         Route::post('/productos/inteligencia', [SolicitudFichaController::class, 'inteligencia'])->name('inteligencia');
         Route::get('/{solicitud}/ficha', [SolicitudFichaController::class, 'show'])->whereNumber('solicitud')->name('ficha');
         Route::put('/{solicitud}', [SolicitudFichaController::class, 'update'])->whereNumber('solicitud')->name('update');
+        Route::get('/{solicitud}/seguimiento', [SolicitudFichaController::class, 'seguimientoContexto'])->whereNumber('solicitud')->name('seguimiento.contexto');
+        Route::post('/{solicitud}/seguimiento', [SolicitudFichaController::class, 'seguimientoGuardar'])->whereNumber('solicitud')->name('seguimiento.guardar');
+        Route::post('/{solicitud}/seguimiento/ia', [SolicitudFichaController::class, 'seguimientoIa'])->whereNumber('solicitud')->name('seguimiento.ia');
         Route::post('/{solicitud}/correo-ia', [SolicitudFichaController::class, 'redactarCorreo'])->whereNumber('solicitud')->name('correo-ia');
         Route::post('/{solicitud}/cerrar', [SolicitudFichaController::class, 'cerrar'])->whereNumber('solicitud')->name('cerrar');
         Route::post('/{solicitud}/reabrir', [SolicitudFichaController::class, 'reabrir'])->whereNumber('solicitud')->name('reabrir');

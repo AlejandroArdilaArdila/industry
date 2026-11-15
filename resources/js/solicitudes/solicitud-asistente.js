@@ -47,6 +47,22 @@ function limpiarHtml(html) {
 /** Texto o HTML de una plantilla, siempre como HTML limpio. */
 const comoHtml = (txt) => (/<[a-z][\s\S]*>/i.test(txt) ? limpiarHtml(txt) : esc(txt).replace(/\r?\n/g, '<br>'));
 
+/** Estilos en línea (los correos no admiten hojas de estilo) con los que se ve el correo del asistente, en la vista previa y al enviarlo. */
+const ESTILO_MAIL = {
+    p: 'margin:0 0 12px;line-height:1.6',
+    h3: 'margin:22px 0 10px;padding-bottom:6px;border-bottom:2px solid #7c3aed;color:#4c1d95;font-size:16px;font-weight:700',
+    ul: 'margin:0 0 14px;padding:0;list-style:none',
+    li: 'margin:0 0 8px;padding:9px 12px;background:#f5f3ff;border-left:3px solid #7c3aed;border-radius:4px;line-height:1.5',
+    hr: 'border:0;border-top:1px solid #e5e7eb;margin:18px 0',
+};
+function embellecer(html) {
+    const doc = new DOMParser().parseFromString(`<div>${html}</div>`, 'text/html');
+    const raiz = doc.body.firstElementChild;
+    Object.entries(ESTILO_MAIL).forEach(([tag, estilo]) => raiz.querySelectorAll(tag).forEach((n) => { if (!n.getAttribute('style')) n.setAttribute('style', estilo); }));
+
+    return raiz.innerHTML;
+}
+
 const itemVacio = () => ({
     id: Math.random().toString(36).slice(2, 8), referencia: '', nombre: '', descripcion: '', cantidad: 1, fk_product: null, vinculo: null,
     foto: null, historial: null, ia: null, iaError: null, cargandoIa: false, cargandoHistorial: false,
@@ -101,9 +117,10 @@ export class SolicitudAsistente {
                 <div class="asi-cuerpo" data-cuerpo></div>
                 <div class="asi-habla">
                     <div class="asi-habla-msg" data-habla-msg></div>
+                    <div class="asi-avisos" data-avisos></div>
                     <div class="asi-habla-fila">
                         <button type="button" class="asi-mic grande" data-mic-habla title="${Reconocimiento ? 'Hablarle al asistente' : 'Tu navegador no permite dictado: usa Chrome o Edge'}" ${Reconocimiento ? '' : 'disabled'}><i class="fa-solid fa-microphone"></i></button>
-                        <textarea data-habla rows="1" maxlength="4000" placeholder="Díselo al asistente: «para el cliente… el producto… para el contacto…» o corrige algo («cambia el contacto a…», «agrega un producto…»)"></textarea>
+                        <textarea data-habla rows="2" maxlength="4000" placeholder="Ej. para el cliente BAVARIA &amp; CIA S C A el producto BANDA MODULAR MCC FG500XLG B=1020 SERIE 500 y MEDIDOR DE FLUJO KROHNE MODELO BATCHFLUX 5500C para el contacto LUIS ALEXANDER ALFONSO"></textarea>
                         <button type="button" class="asi-btn primario" data-enviar-habla><i class="fa-solid fa-paper-plane"></i>Enviar</button>
                     </div>
                 </div>
@@ -214,7 +231,7 @@ export class SolicitudAsistente {
             const hecho = i !== this.paso && this.completo(i);
             const cls = [i === this.paso ? 'on' : '', hecho ? 'hecho' : '', this.puedeIr(i) ? '' : 'bloq'].filter(Boolean).join(' ');
 
-            return `<li><button type="button" data-ir="${i}" class="${cls}" ${i === this.paso ? 'aria-current="step"' : ''} title="${this.puedeIr(i) ? this.nombrePaso(i) : esc(this.motivoBloqueo(i))}">
+            return `<li><button type="button" data-ir="${i}" data-n="${i + 1}" class="${cls}" ${i === this.paso ? 'aria-current="step"' : ''} title="${this.puedeIr(i) ? this.nombrePaso(i) : esc(this.motivoBloqueo(i))}">
                 <span class="asi-pn"><i class="fa-solid ${ICONOS_PASO[i]}"></i>${hecho ? '<em class="asi-chulo"><i class="fa-solid fa-check"></i></em>' : ''}</span><b>${this.nombrePaso(i)}</b></button></li>`;
         }).join('');
     }
@@ -833,7 +850,68 @@ export class SolicitudAsistente {
 
     // ------------------------------------------------------------ «díselo al asistente»
 
+    /**
+     * Problemas que impiden completar la solicitud, paso a paso (cliente → contacto → piezas), con el porqué y cómo resolverlos.
+     * Solo se muestran después de que el usuario le habló al asistente; se recalculan en cada pintado, así desaparecen solos al resolverse.
+     */
+    calcularAvisos() {
+        const t = this.intento;
+        if (!t) return [];
+        const ejemplo = 'para el cliente BAVARIA & CIA S C A el producto BANDA MODULAR MCC FG500XLG B=1020 SERIE 500 para el contacto LUIS ALEXANDER ALFONSO';
+        const av = [];
+        if (t.vacio && !this.datos) {
+            av.push({ nivel: 'error', titulo: 'No pude entender lo que pediste', detalle: 'No identifiqué ni el cliente, ni el contacto, ni las piezas.', ayuda: 'Cuéntamelo con esta estructura: cliente, producto(s) y contacto.', usar: t.sugerencia || ejemplo });
+        }
+        if (!this.datos) {
+            if (t.clienteTexto && t.clienteNoExiste) {
+                av.push({ nivel: 'error', titulo: 'No se puede completar el paso Cliente', detalle: `No encontré «${t.clienteTexto}» entre los clientes activos: puede estar mal escrito, tener otro nombre comercial o no estar creado todavía.`,
+                    ayuda: 'Prueba con el NIT o con la palabra más distintiva del nombre (por ejemplo «Bavaria»). Si es un cliente nuevo, créalo primero en Terceros y vuelve.', ir: 0, irTxt: 'Buscar el cliente a mano' });
+            } else if (!t.clienteTexto && !t.vacio) {
+                av.push({ nivel: 'error', titulo: 'Falta el cliente', detalle: 'No dijiste para qué cliente es la solicitud.', ayuda: 'Empieza por «para el cliente NOMBRE O NIT…».', ir: 0, irTxt: 'Elegir el cliente' });
+            }
+        } else if (!this.contacto) {
+            const lista = this.datos.contactos;
+            const nombres = lista.slice(0, 6);
+            if (!lista.length) {
+                av.push({ nivel: 'error', titulo: 'No se puede completar el paso Contacto', detalle: `${this.cliente.nombre} no tiene contactos registrados, y la solicitud necesita uno.`, ayuda: 'Crea el contacto desde la ficha del cliente (Terceros) y vuelve a este asistente.' });
+            } else {
+                av.push({ nivel: 'error', titulo: 'No se puede completar el paso Contacto',
+                    detalle: t.contactoTexto ? `«${t.contactoTexto}» no coincide con ninguno de los ${lista.length} contactos de ${this.cliente.nombre}: puede estar mal escrito o no estar registrado.` : `No dijiste quién es el contacto de ${this.cliente.nombre}.`,
+                    ayuda: nombres.length ? 'Elige uno de los contactos del cliente o escribe su nombre y apellido tal como está registrado:' : '', contactos: nombres, ir: 1, irTxt: 'Ver todos los contactos' });
+            }
+        } else {
+            if (!this.piezas().length) {
+                av.push({ nivel: 'error', titulo: 'No se puede completar el paso Pieza', detalle: 'No identifiqué ningún producto en lo que dijiste.', ayuda: 'Nombra el producto con su referencia, modelo o serie. Si no la tienes, sube una imagen y la analizo.', ir: 2, irTxt: 'Agregar pieza', usar: t.sugerencia || null });
+            }
+            this.items.forEach((it, i) => {
+                if (!this.itemLleno(it)) return;
+                const nom = it.referencia || it.nombre || `pieza ${i + 1}`;
+                if (!it.referencia.trim() && !it.foto && !it.fk_product) {
+                    av.push({ nivel: 'aviso', titulo: `No puedo identificar «${nom}»`, detalle: 'No tiene referencia ni imagen, así que la búsqueda y el historial serán poco precisos.', ayuda: 'Escribe la referencia o el modelo (está en la placa del equipo o en la factura) o sube una foto de la pieza o de su placa.', foto: i });
+                } else if (it.ia?.identificacion?.confianza === 'baja' || (it.iaError && !it.cargandoIa)) {
+                    av.push({ nivel: 'aviso', titulo: `No pude identificar con seguridad «${nom}»`, detalle: it.iaError ? `El análisis falló: ${it.iaError}` : 'El análisis tiene confianza baja con los datos que hay.', ayuda: it.foto ? 'Prueba con una imagen más nítida (placa o etiqueta legible) o corrige la referencia.' : 'Si no tienes la referencia, sube una imagen y la analizo para completar la solicitud.', foto: i });
+                }
+            });
+        }
+
+        return av;
+    }
+
+    pintarAvisos() {
+        const cont = this.q('[data-avisos]');
+        if (!cont) return;
+        const av = this.calcularAvisos();
+        cont.hidden = !av.length;
+        cont.innerHTML = av.map((a) => `<div class="asi-aviso ${a.nivel}"><i class="fa-solid ${a.nivel === 'error' ? 'fa-circle-xmark' : 'fa-triangle-exclamation'}"></i>
+            <div><b>${esc(a.titulo)}</b><p>${esc(a.detalle)}</p>${a.ayuda ? `<p class="ayuda"><i class="fa-regular fa-lightbulb"></i>${esc(a.ayuda)}</p>` : ''}
+                <div class="acc">${(a.contactos ?? []).map((c) => `<button type="button" class="asi-chip" data-av-contacto="${c.id}">${esc(c.label.split(' — ')[0])}</button>`).join('')}
+                    ${a.usar ? `<button type="button" class="asi-chip" data-av-usar="${esc(a.usar)}"><i class="fa-solid fa-pen"></i>Usar este texto: ${esc(a.usar.length > 90 ? `${a.usar.slice(0, 90)}…` : a.usar)}</button>` : ''}
+                    ${a.foto != null ? `<button type="button" class="asi-chip" data-av-foto="${a.foto}"><i class="fa-solid fa-camera"></i>Subir una imagen</button>` : ''}
+                    ${a.ir != null ? `<button type="button" class="asi-chip" data-av-ir="${a.ir}">${esc(a.irTxt)}</button>` : ''}</div></div></div>`).join('');
+    }
+
     pintarMensaje() {
+        this.pintarAvisos();
         const cont = this.q('[data-habla-msg]');
         if (!cont) return;
         const pend = this.pendiente;
@@ -884,6 +962,11 @@ export class SolicitudAsistente {
     /** Vuelca lo entendido en los pasos: cliente, contacto, elementos, asunto y próximo contacto; luego lleva a lo que falte o a la revisión. */
     async aplicarInterpretacion(r) {
         const notas = [];
+        this.intento = {
+            clienteTexto: r.cliente_texto, contactoTexto: r.contacto_texto, sugerencia: r.sugerencia || '',
+            clienteNoExiste: !!r.cliente_texto && !r.cliente?.elegido && !r.cliente?.candidatos.length,
+            vacio: !r.cliente_texto && !r.contacto_texto && !r.elementos.length,
+        };
         // Cliente
         if (r.cliente_texto) {
             const c = r.cliente;
@@ -1081,9 +1164,13 @@ export class SolicitudAsistente {
         c.cargando = true;
         try {
             c.ctx = await this.pedir(this.urls.correoContextoUrl);
-            if (!c.cuerpo.trim() && c.ctx.plantilla_defecto) this.aplicarPlantilla(c.ctx.plantilla_defecto); // arranca con la plantilla por defecto, como al crear una solicitud a mano
         } catch (e) { c.error = e.message; }
         c.cargando = false;
+        // El correo no parte de una plantilla: el asistente propone uno profesional con las piezas de la solicitud (la firma se agrega sola).
+        if (!c.cuerpo.trim() && !c.manual && !c.autoRedactado && this.piezas().length && this.contacto) {
+            c.autoRedactado = true;
+            return this.redactarCorreo();
+        }
         if (this.abierto && this.paso === PASO_CORREO) this.pintar();
     }
 
@@ -1099,7 +1186,7 @@ export class SolicitudAsistente {
             this.q('[data-prev-para]').textContent = this.destinatarios().filter((d) => d.email).map((d) => `${d.nombre} <${d.email}>`).join(', ') || 'Sin correo';
             this.q('[data-prev-asunto]').textContent = c.asunto || `SOLICITUD CREADA ${this.refProvisional()}`;
             frame.onload = () => { try { frame.style.height = `${Math.max(220, frame.contentDocument.documentElement.scrollHeight + 8)}px`; } catch { /* sin acceso */ } };
-            frame.srcdoc = `<!doctype html><html><head><meta charset="utf-8"><style>body{font:14px/1.55 Arial,Helvetica,sans-serif;color:#1f2937;margin:18px;word-wrap:break-word}p{margin:0 0 10px}img{max-width:100%;height:auto}a{color:#2563eb}</style></head><body>${cuerpo}${firma ? `<br><div>${firma}</div>` : ''}</body></html>`;
+            frame.srcdoc = `<!doctype html><html><head><meta charset="utf-8"><style>body{font:14px/1.55 Arial,Helvetica,sans-serif;color:#1f2937;margin:18px;word-wrap:break-word}p{margin:0 0 10px}img{max-width:100%;height:auto}a{color:#2563eb}</style></head><body>${embellecer(cuerpo)}${firma ? `<br><div>${firma}</div>` : ''}</body></html>`;
         }, 120);
     }
 
@@ -1124,7 +1211,7 @@ export class SolicitudAsistente {
     }
 
     /** Cuerpo y asunto definitivos: la referencia provisional se cambia por la real de la solicitud ya creada. */
-    cuerpoFinal(ref) { return this.correo.cuerpo.replaceAll(this.refProvisional(), ref); }
+    cuerpoFinal(ref) { return embellecer(this.correo.cuerpo).replaceAll(this.refProvisional(), ref); }
 
     asuntoFinal(ref) { return (this.correo.asunto.trim() || 'SOLICITUD CREADA __REF__').replaceAll(this.refProvisional(), ref); }
 
@@ -1297,6 +1384,14 @@ export class SolicitudAsistente {
                 alTerminar: () => { if (area.value.trim() && !this.interpretando) this.enviarHabla(); }, // al dejar de dictar se envía solo
             });
         }
+        const avc = b('[data-av-contacto]');
+        if (avc) { this.contacto = Number(avc.dataset.avContacto); this.relacionados.delete(this.contacto); this.mensaje = 'Listo: contacto elegido.'; this.irAlPrimerFaltante(); this.pintar(); return this.analizarPendientes(); }
+        const avu = b('[data-av-usar]');
+        if (avu) { const area = this.q('[data-habla]'); area.value = avu.dataset.avUsar; area.dispatchEvent(new Event('input', { bubbles: true })); area.focus(); return null; }
+        const avf = b('[data-av-foto]');
+        if (avf) { this.actual = Number(avf.dataset.avFoto); this.paso = 2; this.pintar(); this.q('input[data-foto]:not([capture])')?.click(); return null; }
+        const avi = b('[data-av-ir]');
+        if (avi) { this.paso = Number(avi.dataset.avIr); return this.pintar(); }
         const pend = b('[data-elegir-pend]');
         if (pend) return this.elegirPendiente(Number(pend.dataset.elegirPend));
         if (!b('.asi-sugs') && !b('[data-q-cliente]')) this.dlg.querySelectorAll('[data-sugs],[data-sugs-prod]').forEach((s) => { s.hidden = true; });

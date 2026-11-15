@@ -43,9 +43,9 @@
                 <div class="min-w-0">
                     <h2 data-ficha-titulo class="truncate text-lg font-semibold text-foreground sm:text-xl">{{ $nombre }}</h2>
                     <div class="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-sm text-muted-foreground">
-                        <button type="button" data-copy="{{ $usuario->login }}" title="Copiar usuario"
+                        <button type="button" data-copy="{{ $usuario->login }}" data-ficha-login title="Copiar usuario"
                                 class="inline-flex items-center gap-1.5 rounded-md font-mono text-foreground/80 transition hover:text-primary">
-                            <i class="fa-regular fa-user text-xs"></i> {{ $usuario->login }}
+                            <i class="fa-regular fa-user text-xs"></i> <span data-ficha-login-texto>{{ $usuario->login }}</span>
                             <i class="fa-regular fa-copy text-xs"></i>
                         </button>
                         @if ($usuario->job)
@@ -235,8 +235,9 @@
 
                 <div class="mb-5">
                     <label class="{{ $labelClass }}">Usuario (login)</label>
-                    <input value="{{ $usuario->login }}" disabled class="{{ $inputClass }} font-mono">
-                    <p class="mt-1 text-xs text-muted-foreground">El login no se puede cambiar desde el panel.</p>
+                    <input name="login" value="{{ $usuario->login }}" maxlength="50" autocomplete="off" class="{{ $inputClass }} font-mono">
+                    <p data-error-for="login" class="{{ $errorClass }}"></p>
+                    <p class="mt-1 text-xs text-muted-foreground">Es el nombre con el que entra al panel, Dolibarr y el POS. Debe ser único.</p>
                 </div>
 
                 <div class="grid grid-cols-1 gap-3">

@@ -49,4 +49,14 @@ return [
         'url' => rtrim(env('DOLIBARR_URL', 'https://solu5.waplicaciones.co'), '/'),
     ],
 
+    // Office 365 / Microsoft Graph: calendario de Outlook, Microsoft To Do y reuniones de Teams del programador de actividades.
+    'microsoft' => [
+        'client_id' => env('MS_CLIENT_ID'),
+        'client_secret' => env('MS_CLIENT_SECRET'),
+        'tenant' => env('MS_TENANT_ID', 'organizations'),
+        'redirect' => env('MS_REDIRECT_URI'),
+        // URL pública HTTPS que Microsoft llama al cambiar algo en Outlook (si falta, solo hay sincronización periódica).
+        'webhook_url' => env('MS_WEBHOOK_URL'),
+    ],
+
 ];

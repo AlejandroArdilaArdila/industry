@@ -40,6 +40,24 @@ class ActividadesService
         'orden' => [1 => 'Activa', 2 => 'Pago', 3 => 'Enviada', 6 => 'Aprob. Sol.', 7 => 'Aprobada', 15 => 'Liq. Sol.', 16 => 'Liquidada', 17 => 'Desemb. Sol.', 18 => 'Desemb. Apr.', 20 => 'Pago Confirm.', 32 => 'En revisión', 33 => 'Recolección', 34 => 'Env. Programar', 35 => 'Programado', 36 => 'Reprogramando', 37 => 'Reprogramado'],
     ];
 
+    /** Nombres completos de cada estado (como en el sistema anterior) para la lista de documentos relacionados. */
+    private const ESTADOS_COMPLETOS = [
+        'cotizacion' => [0 => 'Borrador', 1 => 'Activada', 2 => 'Enviada', 3 => 'Clonada', 4 => 'Aprobada', 9 => 'Desactivada'],
+        'exterior' => [0 => 'Borrador', 1 => 'Activa', 2 => 'Enviada', 3 => 'Cotización recibida', 9 => 'Deshabilitada'],
+        'orden' => [0 => 'Borrador', 1 => 'Activa', 2 => 'Activa (abierta para pago)', 3 => 'Enviada', 4 => 'Pagada y en seguimiento', 5 => 'Cerrada', 6 => 'Solicitud de aprobación',
+            7 => 'Abierta para pago', 9 => 'Cerrada', 10 => 'Cancelada', 15 => 'Solicitud de liquidación', 16 => 'Liquidada', 17 => 'Desembolso solicitado', 18 => 'Desembolso aprobado',
+            19 => 'Pago aprobado', 20 => 'Pago confirmado', 31 => 'Rechazada', 32 => 'En revisión', 33 => 'Recolección', 34 => 'Enviada a programar', 35 => 'Programada',
+            36 => 'Ajustando programación', 37 => 'Reprogramada'],
+    ];
+
+    /** Nombre completo de un estado (solicitud, cotización u orden), igual que en el sistema anterior. */
+    public static function nombreEstado(string $modulo, int $status): string
+    {
+        return $modulo === 'solicitud'
+            ? (\App\Http\Controllers\Panel\Solicitudes\SolicitudesGridController::ESTADOS[(string) $status] ?? 'Estado '.$status)
+            : (self::ESTADOS_COMPLETOS[$modulo][$status] ?? 'Estado '.$status);
+    }
+
     private string $p;
 
     public function __construct()
@@ -282,6 +300,68 @@ class ActividadesService
         }
     }
 
+    /**
+     * Documentos ligados a uno: de una solicitud, sus cotizaciones (a proveedores y al cliente) y órdenes de compra; de una
+     * cotización, su solicitud, hermanas y órdenes; de una orden, su cotización y su solicitud.
+     * `modulo` queda null en los que el panel no abre (cotización a proveedores).
+     *
+     * @return array<int, array{titulo: string, icono: string, items: array<int, array<string, mixed>>}>
+     */
+    public function relacionados(string $modulo, int $id): array
+    {
+        $p = $this->p;
+        $valorCot = 'CASE WHEN COALESCE(c.tipo_moneda,0)=1 AND COALESCE(c.trm,0)>0 THEN COALESCE(c.total_bruto,0)*c.trm ELSE COALESCE(c.total_bruto,0) END';
+        $cotiz = fn (string $where, array $b) => array_map(fn ($r) => $this->itemRel('cotizacion', $r), DB::select(
+            "SELECT c.rowid id, c.ref, c.status, c.date_creation fecha, c.label titulo, $valorCot valor FROM {$p}cotizaciones_clientecotizacion c WHERE $where ORDER BY c.rowid DESC LIMIT 30", $b));
+        $ordenes = fn (string $where, array $b) => array_map(fn ($r) => $this->itemRel('orden', $r), DB::select(
+            "SELECT o.rowid id, o.ref, o.status, o.date_creation fecha, o.asunto titulo,
+                CASE WHEN COALESCE(c.tipo_moneda,0)=1 AND COALESCE(c.trm,0)>0 THEN COALESCE(oe.total_productos, o.total_bruto, 0)*c.trm ELSE COALESCE(oe.total_productos, o.total_bruto, 0) END valor
+             FROM {$p}ordencompra_orden o LEFT JOIN {$p}ordencompra_orden_extrafields oe ON oe.fk_object = o.rowid
+             LEFT JOIN {$p}cotizaciones_clientecotizacion c ON c.rowid = o.fk_cliente_cotizacion WHERE $where ORDER BY o.rowid DESC LIMIT 30", $b));
+        $solicitud = fn (int $sid) => array_map(fn ($r) => $this->itemRel('solicitud', $r), DB::select(
+            "SELECT t.rowid id, t.ref, t.status, t.date_creation fecha, t.asunto titulo, NULL valor FROM {$p}solicitudes_solicitud t WHERE t.rowid = ?", [$sid]));
+        $exterior = fn (int $sid) => array_map(fn ($r) => $this->itemRel(null, $r), DB::select(
+            "SELECT e.rowid id, e.ref, e.status, e.date_creation fecha, NULL titulo, NULL valor FROM {$p}cotiext_exterior e WHERE e.fk_solicitud = ? ORDER BY e.rowid DESC LIMIT 30", [$sid]));
+
+        $grupos = [];
+        $sid = null;
+        if ($modulo === 'solicitud') {
+            $sid = $id;
+            $cot = $cotiz('c.fk_solicitud = ?', [$id]);
+            $ids = array_column($cot, 'id');
+            $grupos[] = ['titulo' => 'Cotizaciones a proveedores', 'icono' => 'fa-paper-plane', 'items' => $exterior($id)];
+            $grupos[] = ['titulo' => 'Cotizaciones al cliente', 'icono' => 'fa-file-invoice-dollar', 'items' => $cot];
+            $grupos[] = ['titulo' => 'Órdenes de compra', 'icono' => 'fa-shopping-cart', 'items' => $ids ? $ordenes('o.fk_cliente_cotizacion IN ('.implode(',', array_map('intval', $ids)).')', []) : []];
+        } elseif ($modulo === 'cotizacion') {
+            $sid = (int) (DB::selectOne("SELECT fk_solicitud s FROM {$p}cotizaciones_clientecotizacion WHERE rowid = ?", [$id])->s ?? 0);
+            $grupos[] = ['titulo' => 'Solicitud', 'icono' => 'fa-inbox', 'items' => $sid ? $solicitud($sid) : []];
+            $grupos[] = ['titulo' => 'Cotizaciones a proveedores', 'icono' => 'fa-paper-plane', 'items' => $sid ? $exterior($sid) : []];
+            $grupos[] = ['titulo' => 'Otras cotizaciones de la solicitud', 'icono' => 'fa-file-invoice-dollar', 'items' => $sid ? $cotiz('c.fk_solicitud = ? AND c.rowid <> ?', [$sid, $id]) : []];
+            $grupos[] = ['titulo' => 'Órdenes de compra', 'icono' => 'fa-shopping-cart', 'items' => $ordenes('o.fk_cliente_cotizacion = ?', [$id])];
+        } else {
+            $cid = (int) (DB::selectOne("SELECT fk_cliente_cotizacion c FROM {$p}ordencompra_orden WHERE rowid = ?", [$id])->c ?? 0);
+            $sid = $cid ? (int) (DB::selectOne("SELECT fk_solicitud s FROM {$p}cotizaciones_clientecotizacion WHERE rowid = ?", [$cid])->s ?? 0) : 0;
+            $grupos[] = ['titulo' => 'Solicitud', 'icono' => 'fa-inbox', 'items' => $sid ? $solicitud($sid) : []];
+            $grupos[] = ['titulo' => 'Cotización al cliente', 'icono' => 'fa-file-invoice-dollar', 'items' => $cid ? $cotiz('c.rowid = ?', [$cid]) : []];
+            $grupos[] = ['titulo' => 'Otras órdenes de la cotización', 'icono' => 'fa-shopping-cart', 'items' => $cid ? $ordenes('o.fk_cliente_cotizacion = ? AND o.rowid <> ?', [$cid, $id]) : []];
+        }
+
+        return array_values(array_filter($grupos, fn ($g) => $g['items']));
+    }
+
+    private function itemRel(?string $modulo, object $r): array
+    {
+        return [
+            'modulo' => $modulo, 'id' => (int) $r->id, 'ref' => (string) $r->ref,
+            'estado' => $modulo === 'solicitud'
+                ? (\App\Http\Controllers\Panel\Solicitudes\SolicitudesGridController::ESTADOS[(string) $r->status] ?? 'Estado '.$r->status)
+                : (self::ESTADOS_COMPLETOS[$modulo ?? 'exterior'][(int) $r->status] ?? 'Estado '.$r->status),
+            'fecha' => $r->fecha ? substr((string) $r->fecha, 0, 10) : null,
+            'titulo' => $r->titulo !== null ? trim(preg_replace('/\s+/u', ' ', html_entity_decode(strip_tags((string) $r->titulo), ENT_QUOTES, 'UTF-8'))) : null,
+            'valor' => $r->valor !== null ? (float) $r->valor : null,
+        ];
+    }
+
     private function fechaTxt(?string $v, bool $hora = false): ?string
     {
         return $v && ! str_starts_with($v, '0000') ? Carbon::parse($v)->format($hora ? 'd/m/Y H:i' : 'd/m/Y') : null;
@@ -424,8 +504,10 @@ class ActividadesService
         $pend = $estado !== 'realizados';
 
         $filas = DB::select("SELECT a.id, a.label, a.datep, a.percent, a.note, a.fk_element, a.elementtype,
-                COALESCE(ss.ref, cc.ref, oo.ref) ref, COALESCE(s.nom, 'Sin empresa') empresa
+                COALESCE(ss.ref, cc.ref, oo.ref) ref, COALESCE(s.nom, 'Sin empresa') empresa,
+                (mv.ms_evento_id IS NOT NULL OR mv.ms_tarea_id IS NOT NULL) ms, mv.teams_url
             FROM {$p}actioncomm a
+            LEFT JOIN {$p}panel_ms_vinculos mv ON mv.actioncomm_id = a.id
             LEFT JOIN {$p}solicitudes_solicitud ss ON ss.rowid = a.fk_element AND a.elementtype = 'solicitud'
             LEFT JOIN {$p}cotizaciones_clientecotizacion cc ON cc.rowid = a.fk_element AND a.elementtype = 'clientecotizacion'
             LEFT JOIN {$p}ordencompra_orden oo ON oo.rowid = a.fk_element AND a.elementtype = 'orden'
@@ -461,6 +543,8 @@ class ActividadesService
                 'horaVencida' => $pend && $cuando->lt($ahora),
                 'observacion' => trim($partes[0]),
                 'actividad' => trim($partes[1] ?? ''),
+                'ms' => (bool) $f->ms,
+                'teams' => $f->teams_url ?: null,
             ];
         }, $filas);
 

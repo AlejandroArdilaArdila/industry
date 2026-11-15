@@ -4,6 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
+    <meta name="solicitud-seguimiento" content="{{ json_encode(['ctx' => route('panel.solicitudes.seguimiento.contexto', '__ID__'), 'guardar' => route('panel.solicitudes.seguimiento.guardar', '__ID__'), 'ia' => route('panel.solicitudes.seguimiento.ia', '__ID__')]) }}">
     <title>@yield('title', config('app.name', 'Panel'))</title>
     <script>
         // Aplica el color/modo guardados antes de pintar, para evitar parpadeo.

@@ -184,6 +184,12 @@ export class UsuarioFichaModal extends FichaModal {
         if (!usuario) return;
         const titulo = this.root.querySelector('[data-ficha-titulo]');
         if (titulo) titulo.textContent = usuario.nombre;
+        if (usuario.login) {
+            const btn = this.root.querySelector('[data-ficha-login]');
+            if (btn) btn.dataset.copy = usuario.login;
+            const txt = this.root.querySelector('[data-ficha-login-texto]');
+            if (txt) txt.textContent = usuario.login;
+        }
         this.pintarEstado(usuario.statut === '1');
         this.root.querySelector('[data-ficha-admin]')?.classList.toggle('hidden', usuario.admin !== '1');
 

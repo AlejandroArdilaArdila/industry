@@ -8,6 +8,7 @@
     $labelClass = 'mb-1.5 block text-xs font-medium text-muted-foreground';
     $inputClass = 'w-full h-10 rounded-lg border border-input bg-background px-3 text-sm text-foreground shadow-xs transition placeholder:text-muted-foreground/60 focus:border-primary focus:outline-none focus:ring-3 focus:ring-primary/15 disabled:cursor-not-allowed disabled:opacity-60';
     $errorClass = 'mt-1 hidden text-xs text-destructive';
+    $esSol = ($doc['modulo'] ?? '') === 'solicitud';
     $color = $doc ? ($colores[$doc['card']]['fondo'] ?? '#2563eb') : null;
     $dinero = fn ($v) => '$ '.number_format((float) $v, 0, ',', '.');
     $fmt = fn ($f, $formato = 'd/m/Y H:i') => \Illuminate\Support\Carbon::parse($f)->format($formato);
@@ -109,6 +110,7 @@
                 <div data-tabs class="relative z-30 mb-5 flex flex-wrap items-center gap-1 border-b border-border">
                     <button type="button" data-tab="documento" class="act-tab"><i class="fa-solid fa-file-lines"></i> {{ $doc['moduloNombre'] }}</button>
                     <button type="button" data-tab="seguimiento" class="act-tab"><i class="fa-solid fa-pen-to-square"></i> Seguimiento <span class="rounded-full bg-muted px-1.5 text-[10px] font-medium text-muted-foreground">{{ count($historial) }}</span></button>
+                    <button type="button" data-tab="relacionados" class="act-tab"><i class="fa-solid fa-link"></i> Documentos relacionados <span class="rounded-full bg-muted px-1.5 text-[10px] font-medium text-muted-foreground">{{ collect($relacionados ?? [])->sum(fn ($g) => count($g['items'])) }}</span></button>
                     <span data-nav-slot class="ml-auto pb-1"></span>
                 </div>
                 <div data-tab-panel="documento" hidden>
@@ -141,6 +143,16 @@
 
             <div @if (! empty($detalle)) data-tab-panel="seguimiento" hidden @endif>
 
+            @if ($esSol)
+                {{-- Seguimiento estándar de solicitudes: el mismo diálogo del tablero (observación, próximo contacto y correo con IA). --}}
+                <button type="button" data-seg-estandar data-id="{{ $doc['id'] }}" data-ref="{{ $doc['ref'] }}"
+                        class="group flex w-full items-center gap-4 rounded-2xl border border-dashed border-primary/40 bg-primary/5 px-5 py-4 text-left transition hover:border-primary hover:bg-primary/10">
+                    <span class="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-md transition group-hover:scale-105"><i class="fa-solid fa-comment-medical"></i></span>
+                    <span class="min-w-0"><b class="block text-sm text-foreground">Registrar seguimiento</b>
+                        <span class="block text-xs text-muted-foreground">Observación, próximo contacto y correo al cliente con borrador de IA</span></span>
+                    <i class="fa-solid fa-arrow-right ml-auto text-primary transition group-hover:translate-x-1"></i>
+                </button>
+            @else
             <h3 class="mb-3 flex items-center gap-2 text-sm font-semibold"><i class="fa-solid fa-pen-to-square text-primary"></i> Nuevo seguimiento</h3>
             <div>
                 <label class="{{ $labelClass }}" for="act_observacion">Observación <span class="text-destructive">*</span></label>
@@ -178,7 +190,17 @@
                     <input type="text" id="act_titulo" name="titulo" maxlength="255" value="Dar seguimiento a {{ $doc['ref'] }}" class="{{ $inputClass }}" data-required-prog>
                     <p data-error-for="titulo" class="{{ $errorClass }}"></p>
                 </div>
+                @if (($ms['conectado'] ?? false) && ($ms['calendario'] ?? false))
+                    <input type="hidden" name="teams" value="0">
+                    <label class="flex cursor-pointer items-center gap-3 rounded-xl border border-border bg-background px-4 py-3 text-sm transition has-[:checked]:border-primary has-[:checked]:bg-primary/5">
+                        <input type="checkbox" name="teams" value="1" @checked($ms['teams'] ?? false) class="h-4 w-4 accent-[var(--primary)]">
+                        <span class="font-medium">Crear reunión de Microsoft Teams</span>
+                        <span class="text-xs text-muted-foreground">se agenda en tu Outlook</span>
+                        <i class="fa-brands fa-microsoft ml-auto text-primary"></i>
+                    </label>
+                @endif
             </div>
+            @endif
 
             {{-- ---------- Historial ---------- --}}
             <h3 class="mt-8 mb-3 flex items-center gap-2 text-sm font-semibold"><i class="fa-solid fa-clock-rotate-left text-primary"></i> Historial del documento
@@ -227,11 +249,44 @@
 
             </div>
 
+            @if (! empty($detalle))
+                <div data-tab-panel="relacionados" hidden>
+                    <h3 class="mb-3 flex items-center gap-2 text-sm font-semibold"><i class="fa-solid fa-link text-primary"></i> Documentos relacionados</h3>
+                    @forelse ($relacionados ?? [] as $g)
+                        <div class="mb-5">
+                            <p class="mb-2 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground"><i class="fa-solid {{ $g['icono'] }}"></i> {{ $g['titulo'] }}
+                                <span class="rounded-full bg-muted px-1.5 text-[10px] font-medium normal-case">{{ count($g['items']) }}</span></p>
+                            <ul class="space-y-2">
+                                @foreach ($g['items'] as $it)
+                                    @php $ico = $it['modulo'] ? (\App\Services\Panel\ActividadesService::MODULOS[$it['modulo']]['icono'] ?? 'fa-file') : 'fa-paper-plane'; $etq = $it['modulo'] ? 'button' : 'div'; @endphp
+                                    <li>
+                                        <{{ $etq }} @if ($it['modulo']) type="button" data-rel-doc="{{ $it['modulo'] }}:{{ $it['id'] }}" @endif class="flex w-full items-center gap-3 rounded-xl border border-border bg-card px-3.5 py-2.5 text-left text-sm transition {{ $it['modulo'] ? 'hover:border-primary hover:bg-primary/5 cursor-pointer' : '' }}">
+                                            <span class="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary"><i class="fa-solid {{ $ico }}"></i></span>
+                                            <span class="min-w-0 flex-1">
+                                                <b class="block text-foreground">{{ $it['ref'] }}</b>
+                                                @if ($it['titulo'])<span class="block truncate text-xs text-muted-foreground">{{ $it['titulo'] }}</span>@endif
+                                            </span>
+                                            <span class="flex flex-col items-end gap-0.5 text-xs">
+                                                <span class="rounded-full bg-muted px-2 py-0.5 font-semibold text-foreground">{{ $it['estado'] }}</span>
+                                                <span class="text-muted-foreground">{{ $it['fecha'] ? \Illuminate\Support\Carbon::parse($it['fecha'])->format('d/m/Y') : '' }}@if ($it['valor']) · {{ $dinero($it['valor']) }}@endif</span>
+                                            </span>
+                                            @if ($it['modulo'])<i class="fa-solid fa-chevron-right text-xs text-muted-foreground"></i>@endif
+                                        </{{ $etq }}>
+                                    </li>
+                                @endforeach
+                            </ul>
+                        </div>
+                    @empty
+                        <p class="rounded-xl border border-dashed border-border p-5 text-center text-sm text-muted-foreground">Este documento todavía no tiene documentos relacionados.</p>
+                    @endforelse
+                </div>
+            @endif
+
             <div class="h-8 flex-shrink-0"></div>
             <div class="sticky bottom-0 -mx-5 mt-auto -mb-5 flex items-center gap-3 border-t border-border bg-card/95 px-5 py-3 backdrop-blur sm:-mx-7 sm:-mb-7 sm:px-7">
-                <span data-step-status class="mr-auto ml-1 text-xs text-muted-foreground">Ctrl+S para guardar</span>
+                <span data-step-status class="mr-auto ml-1 text-xs text-muted-foreground">{{ $esSol ? '' : 'Ctrl+S para guardar' }}</span>
                 <button type="button" data-ficha-close class="inline-flex h-9 items-center rounded-lg px-3 text-sm font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground">Cerrar</button>
-                <button type="submit" data-step-save data-ultimo="1" class="inline-flex h-9 items-center gap-2 rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground shadow-sm transition hover:opacity-90 disabled:cursor-wait disabled:opacity-60">
+                <button type="submit" data-step-save {{ $esSol ? 'hidden' : '' }} data-ultimo="1" class="inline-flex h-9 items-center gap-2 rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground shadow-sm transition hover:opacity-90 disabled:cursor-wait disabled:opacity-60">
                     <span data-spinner class="hidden"><i class="fa-solid fa-circle-notch fa-spin"></i></span>
                     <span data-label>Guardar seguimiento</span>
                 </button>

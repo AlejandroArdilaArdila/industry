@@ -74,6 +74,8 @@ class PanelDashboardController extends Controller
             (string) $request->query('periodo', '30'),
             $request->query('alcance', 'todos') !== 'mios',
             (string) $request->query('q', ''),
+            40,
+            in_array($request->query('nivel'), ['mora', 'riesgo', 'aldia'], true) ? (string) $request->query('nivel') : '',
         ));
     }
 

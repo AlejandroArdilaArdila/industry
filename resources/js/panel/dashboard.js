@@ -20,7 +20,7 @@ try {
     if (pref.periodo && document.querySelector(`#d-periodos [data-periodo="${pref.periodo}"]`)) estado.periodo = pref.periodo;
 } catch { /* sin almacenamiento */ }
 
-const actividades = iniciarActividades({ url: cfg.urlActividades, panelUrl: cfg.urlPanelActividades, csrf: cfg.csrf });
+const actividades = iniciarActividades({ url: cfg.urlActividades, panelUrl: cfg.urlPanelActividades, csrf: cfg.csrf, tareas: { form: cfg.urlTareaForm, show: cfg.urlTareaShow, estado: cfg.urlTareaEstado }, ms: cfg.urlMicrosoft ? { estado: cfg.urlMicrosoft, conectar: cfg.urlMicrosoftConectar, prefs: cfg.urlMicrosoftPrefs, sync: cfg.urlMicrosoftSync, eventos: cfg.urlMicrosoftEventos, base: cfg.urlMicrosoftBase } : null });
 const etapas = iniciarEtapas({ url: cfg.urlEtapas, urlDocumentos: cfg.urlDocumentos, getPeriodo: () => estado.periodo, esAdmin: cfg.esAdmin, onAbrir: (modulo, id) => actividades.abrir(modulo, id) });
 const proceso = iniciarProceso({
     url: cfg.urlProceso,

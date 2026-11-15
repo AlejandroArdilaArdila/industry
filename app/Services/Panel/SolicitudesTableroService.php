@@ -2,6 +2,7 @@
 
 namespace App\Services\Panel;
 
+use App\Services\Ia\IaConfigService;
 use App\Http\Controllers\Panel\Solicitudes\SolicitudesGridController;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
@@ -25,12 +26,21 @@ class SolicitudesTableroService
     public const MORA_VERDE = 15;
     public const MORA_AMBAR = 30;
 
-    /** Columnas de la más a la menos urgente. Cada solicitud cae en una sola: «Por contactar» manda sobre la mora. */
+    /** Nombre de la constante donde se guarda la configuración editable de las columnas. */
+    public const CONST_COLUMNAS = 'PANEL_SOLICITUDES_TABLERO_COLUMNAS';
+
+    /** Valores de «contacto»: cualquiera, solo con el próximo contacto vencido (o para hoy) o solo sin vencer. */
+    public const CONTACTOS = ['cualquiera', 'vencido', 'no_vencido'];
+
+    /**
+     * Columnas por defecto y sus reglas. Cada solicitud cae en la PRIMERA columna (en el orden configurado) cuyas reglas cumple:
+     * estados (vacío = todos los del tablero), mora mínima y máxima en días desde la creación (null = sin límite) y estado del contacto.
+     */
     public const COLUMNAS = [
-        'atrasadas' => ['titulo' => 'Atrasadas', 'icono' => 'fa-fire', 'color' => '#dc2626', 'ayuda' => 'Más de 30 días de mora'],
-        'atencion' => ['titulo' => 'Atención', 'icono' => 'fa-triangle-exclamation', 'color' => '#d97706', 'ayuda' => 'De 16 a 30 días de mora'],
-        'contactar' => ['titulo' => 'Por contactar', 'icono' => 'fa-bell', 'color' => '#7c3aed', 'ayuda' => 'Próximo contacto vencido o para hoy'],
-        'aldia' => ['titulo' => 'Al día', 'icono' => 'fa-circle-check', 'color' => '#16a34a', 'ayuda' => 'Hasta 15 días de mora'],
+        'atrasadas' => ['titulo' => 'Atrasadas', 'icono' => 'fa-fire', 'color' => '#dc2626', 'estados' => [], 'moraMin' => self::MORA_AMBAR + 1, 'moraMax' => null, 'contacto' => 'no_vencido'],
+        'atencion' => ['titulo' => 'Atención', 'icono' => 'fa-triangle-exclamation', 'color' => '#d97706', 'estados' => [], 'moraMin' => self::MORA_VERDE + 1, 'moraMax' => self::MORA_AMBAR, 'contacto' => 'no_vencido'],
+        'contactar' => ['titulo' => 'Por contactar', 'icono' => 'fa-bell', 'color' => '#7c3aed', 'estados' => [], 'moraMin' => null, 'moraMax' => null, 'contacto' => 'vencido'],
+        'aldia' => ['titulo' => 'Al día', 'icono' => 'fa-circle-check', 'color' => '#16a34a', 'estados' => [], 'moraMin' => null, 'moraMax' => self::MORA_VERDE, 'contacto' => 'no_vencido'],
     ];
 
     private string $p;
@@ -40,11 +50,145 @@ class SolicitudesTableroService
         $this->p = DB::getTablePrefix();
     }
 
+    /**
+     * Columnas vigentes, en orden: las por defecto con lo que haya guardado encima (título, reglas y orden).
+     *
+     * @return array<string, array<string, mixed>>
+     */
+    public function columnas(): array
+    {
+        $guardado = IaConfigService::json(self::CONST_COLUMNAS) ?? [];
+        $orden = array_values(array_unique(array_merge(
+            array_filter((array) ($guardado['orden'] ?? []), fn ($k) => isset(self::COLUMNAS[$k])),
+            array_keys(self::COLUMNAS),
+        )));
+        $out = [];
+        foreach ($orden as $k) {
+            $c = array_merge(self::COLUMNAS[$k], array_intersect_key((array) ($guardado['columnas'][$k] ?? []), self::COLUMNAS[$k]));
+            $c['ayuda'] = $this->ayuda($c);
+            $out[$k] = $c;
+        }
+
+        return $out;
+    }
+
+    /** Texto corto que describe las reglas de una columna. */
+    private function ayuda(array $c): string
+    {
+        $p = [];
+        $min = $c['moraMin'];
+        $max = $c['moraMax'];
+        if ($min !== null && $max !== null) {
+            $p[] = "De $min a $max días de mora";
+        } elseif ($min !== null) {
+            $p[] = "Más de ".($min - 1)." días de mora";
+        } elseif ($max !== null) {
+            $p[] = "Hasta $max días de mora";
+        }
+        if ($c['contacto'] === 'vencido') {
+            $p[] = 'próximo contacto vencido o para hoy';
+        } elseif ($c['contacto'] === 'no_vencido') {
+            $p[] = 'sin contacto vencido';
+        }
+        if ($c['estados']) {
+            $p[] = 'estados: '.implode(', ', array_map(fn ($e) => SolicitudesGridController::ESTADOS[(string) $e] ?? $e, $c['estados']));
+        }
+
+        return $p ? ucfirst(implode(' · ', $p)) : 'Todas las solicitudes que no entraron en una columna anterior';
+    }
+
+    /**
+     * Guarda título, reglas y orden de las columnas. Lo que no cambie respecto al valor por defecto no se guarda.
+     *
+     * @param  array<int, array<string, mixed>>  $columnas  en el orden deseado; cada una con 'clave' y los campos editables
+     */
+    public function guardarColumnas(array $columnas): void
+    {
+        $orden = [];
+        $guardar = [];
+        foreach ($columnas as $c) {
+            $k = (string) ($c['clave'] ?? '');
+            if (! isset(self::COLUMNAS[$k]) || in_array($k, $orden, true)) {
+                continue;
+            }
+            $orden[] = $k;
+            $c += self::COLUMNAS[$k]; // lo que no venga se queda con el valor por defecto (así funciona «Restablecer»)
+            $titulo = trim((string) ($c['titulo'] ?? ''));
+            $nuevo = [
+                'titulo' => $titulo !== '' ? mb_substr($titulo, 0, 40) : self::COLUMNAS[$k]['titulo'],
+                'estados' => array_values(array_intersect(array_map('intval', (array) ($c['estados'] ?? [])), self::ESTADOS_TABLERO)),
+                'moraMin' => isset($c['moraMin']) && $c['moraMin'] !== '' ? max(0, (int) $c['moraMin']) : null,
+                'moraMax' => isset($c['moraMax']) && $c['moraMax'] !== '' ? max(0, (int) $c['moraMax']) : null,
+                'contacto' => in_array($c['contacto'] ?? '', self::CONTACTOS, true) ? $c['contacto'] : 'cualquiera',
+            ];
+            $dif = array_filter($nuevo, fn ($v, $campo) => $v !== self::COLUMNAS[$k][$campo], ARRAY_FILTER_USE_BOTH);
+            if ($dif) {
+                $guardar[$k] = $dif;
+            }
+        }
+        $porDefecto = $orden === array_keys(self::COLUMNAS);
+        $valor = ['columnas' => $guardar] + ($porDefecto ? [] : ['orden' => $orden]);
+        $guardar || ! $porDefecto
+            ? IaConfigService::escribir(self::CONST_COLUMNAS, $valor, 'Columnas del tablero de solicitudes: títulos, reglas y orden')
+            : IaConfigService::borrar(self::CONST_COLUMNAS);
+    }
+
+    /**
+     * Cuántas solicitudes hay en cada columna del tablero (mismas reglas que las tarjetas). $uid limita a las de un usuario.
+     *
+     * @return array<int, array{clave: string, titulo: string, color: string, n: int}>
+     */
+    public function conteos(?int $uid = null): array
+    {
+        $mora = 'DATEDIFF(CURDATE(), DATE(t.date_creation))';
+        $contactar = 't.fecha_proximo_contacto IS NOT NULL AND DATE(t.fecha_proximo_contacto) <= CURDATE()';
+        $base = 't.status IN ('.implode(',', self::ESTADOS_TABLERO).')';
+        $b = [];
+        if ($uid) {
+            $base .= ' AND t.'.$this->actividades->campoUsuario().' = ?';
+            $b[] = $uid;
+        }
+        $out = [];
+        $previas = '';
+        foreach ($this->columnas() as $k => $c) {
+            $cond = $this->condicion($c, $mora, $contactar);
+            $n = (int) (DB::selectOne("SELECT COUNT(*) n FROM {$this->p}solicitudes_solicitud t WHERE $base$previas AND $cond", $b)->n ?? 0);
+            $extremo = fn (string $orden) => ($f = DB::selectOne("SELECT t.rowid id, t.ref, t.date_creation fecha, $mora dias FROM {$this->p}solicitudes_solicitud t WHERE $base$previas AND $cond ORDER BY t.date_creation $orden, t.rowid $orden LIMIT 1", $b))
+                ? ['id' => (int) $f->id, 'ref' => $f->ref, 'fecha' => substr((string) $f->fecha, 0, 10), 'dias' => max(0, (int) $f->dias)] : null;
+            $out[] = ['clave' => $k, 'titulo' => $c['titulo'], 'color' => $c['color'], 'n' => $n, 'ayuda' => $c['ayuda'], 'masAntigua' => $n ? $extremo('ASC') : null, 'masNueva' => $n ? $extremo('DESC') : null];
+            $previas .= " AND NOT $cond";
+        }
+
+        return $out;
+    }
+
+    /** Condición SQL de una columna según sus reglas (sin tener en cuenta las columnas anteriores). */
+    private function condicion(array $c, string $mora, string $contactar): string
+    {
+        $w = ['1=1'];
+        if ($c['estados']) {
+            $w[] = 't.status IN ('.implode(',', array_map('intval', $c['estados'])).')';
+        }
+        if ($c['moraMin'] !== null) {
+            $w[] = "$mora >= ".(int) $c['moraMin'];
+        }
+        if ($c['moraMax'] !== null) {
+            $w[] = "$mora <= ".(int) $c['moraMax'];
+        }
+        if ($c['contacto'] === 'vencido') {
+            $w[] = "($contactar)";
+        } elseif ($c['contacto'] === 'no_vencido') {
+            $w[] = "NOT ($contactar)";
+        }
+
+        return '('.implode(' AND ', $w).')';
+    }
+
     /** Definición para el cliente (sin datos): columnas y estados que se pueden asignar. */
     public function definicion(): array
     {
         $columnas = [];
-        foreach (self::COLUMNAS as $clave => $c) {
+        foreach ($this->columnas() as $clave => $c) {
             $columnas[] = ['clave' => $clave] + $c;
         }
         $estados = [];
@@ -52,7 +196,7 @@ class SolicitudesTableroService
             $estados[] = ['id' => $e, 'nombre' => SolicitudesGridController::ESTADOS[(string) $e] ?? "Estado $e"];
         }
 
-        return ['columnas' => $columnas, 'estados' => $estados];
+        return ['columnas' => $columnas, 'estados' => $estados, 'estadosTablero' => array_map(fn ($e) => ['id' => $e, 'nombre' => SolicitudesGridController::ESTADOS[(string) $e] ?? "Estado $e"], self::ESTADOS_TABLERO)];
     }
 
     /**
@@ -62,7 +206,8 @@ class SolicitudesTableroService
      */
     public function columna(object $usuario, string $clave, array $filtros, int $skip = 0): array
     {
-        if (! isset(self::COLUMNAS[$clave])) {
+        $columnas = $this->columnas();
+        if (! isset($columnas[$clave])) {
             throw new InvalidArgumentException('Columna inválida.');
         }
         $estados = array_values(array_intersect(array_map('intval', $filtros['estados'] ?? []), self::ESTADOS_TABLERO)) ?: self::ESTADOS_TABLERO;
@@ -75,17 +220,27 @@ class SolicitudesTableroService
         }
         $mora = 'DATEDIFF(CURDATE(), DATE(t.date_creation))';
         $contactar = 't.fecha_proximo_contacto IS NOT NULL AND DATE(t.fecha_proximo_contacto) <= CURDATE()';
-        $where .= match ($clave) {
-            'contactar' => " AND $contactar",
-            'aldia' => " AND NOT ($contactar) AND $mora <= ".self::MORA_VERDE,
-            'atencion' => " AND NOT ($contactar) AND $mora > ".self::MORA_VERDE." AND $mora <= ".self::MORA_AMBAR,
-            default => " AND NOT ($contactar) AND $mora > ".self::MORA_AMBAR,
-        };
+        // Cae en la primera columna cuyas reglas cumple: las de esta y que no cumpla ninguna de las anteriores.
+        foreach ($columnas as $k => $c) {
+            if ($k === $clave) {
+                $where .= ' AND '.$this->condicion($c, $mora, $contactar);
+                break;
+            }
+            $where .= ' AND NOT '.$this->condicion($c, $mora, $contactar);
+        }
         $q = trim((string) ($filtros['q'] ?? ''));
         if ($q !== '') {
             $like = '%'.str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $q).'%';
             $where .= ' AND (t.ref LIKE ? OR s.nom LIKE ? OR t.asunto LIKE ?)';
             array_push($b, $like, $like, $like);
+        }
+        if (! empty($filtros['desde'])) {
+            $where .= ' AND DATE(t.date_creation) >= ?';
+            $b[] = $filtros['desde'];
+        }
+        if (! empty($filtros['hasta'])) {
+            $where .= ' AND DATE(t.date_creation) <= ?';
+            $b[] = $filtros['hasta'];
         }
         $desde = "FROM {$this->p}solicitudes_solicitud t
             LEFT JOIN {$this->p}societe s ON s.rowid = t.fk_soc

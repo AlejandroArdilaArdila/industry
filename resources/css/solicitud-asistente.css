@@ -19,6 +19,11 @@
 .asi-pasos li + li::before { content: ''; position: absolute; top: 24px; left: -50%; width: 100%; height: 2px; background: var(--border); }
 .asi-pasos li:has(button.hecho) + li::before, .asi-pasos li:has(button.on) + li::before { background: color-mix(in oklab, var(--verde) 55%, var(--border)); }
 .asi-pasos button { position: relative; display: flex; flex-direction: column; align-items: center; gap: 4px; width: 104px; padding: 6px 6px 7px; border: 0; border-radius: 12px; background: none; font-size: 12px; color: var(--muted-foreground); cursor: pointer; transition: background-color 0.25s, color 0.25s; }
+/* Número grande de fondo en cada paso */
+.asi-pasos button { overflow: hidden; isolation: isolate; }
+.asi-pasos button::after { content: attr(data-n); position: absolute; right: 2px; bottom: -2px; z-index: -1; font-size: 60px; font-weight: 800; line-height: 1; letter-spacing: -0.04em; color: color-mix(in oklab, var(--viol) 24%, transparent); pointer-events: none; transition: color 0.25s; }
+.asi-pasos button.hecho::after { color: color-mix(in oklab, var(--verde) 32%, transparent); }
+.asi-pasos button.on::after { color: color-mix(in oklab, var(--viol) 40%, transparent); }
 .asi-pasos button b { font-weight: 700; line-height: 1.2; }
 .asi-pasos button:hover:not(.on) { background: var(--muted); color: var(--foreground); }
 .asi-pn { position: relative; z-index: 1; width: 36px; height: 36px; display: grid; place-items: center; border-radius: 50%; background: var(--muted); color: var(--muted-foreground); font-size: 14px; transition: background-color 0.25s, box-shadow 0.25s, color 0.25s; }
@@ -43,7 +48,7 @@
 .asi-chip:hover { background: var(--viol); color: var(--brand-fg); }
 .asi-habla-fila { display: flex; align-items: flex-end; gap: 8px; }
 .asi-hmsg.error { color: #dc2626; }
-.asi-habla-fila textarea { width: 0; min-width: 0; flex: 1 1 0; min-height: 42px; max-height: 110px; resize: none; padding-top: 10px; }
+.asi-habla-fila textarea { width: 0; min-width: 0; flex: 1 1 0; min-height: 58px; max-height: 110px; resize: none; padding-top: 10px; }
 .asi-mic.grande { position: static; flex: 0 0 auto; width: 42px; height: 42px; font-size: 16px; }
 .asi-habla-fila .asi-btn { height: 42px; }
 .asi-pie { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 18px; border-top: 1px solid var(--border); background: var(--card); }
@@ -257,7 +262,7 @@
 .asi-ident { padding: 12px 14px; border-radius: 12px; background: color-mix(in oklab, var(--viol) 6%, var(--card)); border: 1px solid color-mix(in oklab, var(--viol) 22%, var(--border)); }
 .asi-ident-t { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 15px; }
 .asi-conf { padding: 0 8px; border-radius: 999px; font-size: 10.5px; font-weight: 800; line-height: 19px; background: var(--muted); color: var(--muted-foreground); }
-.asi-conf.alta { background: color-mix(in oklab, var(--verde) 16%, transparent); color: var(--verde); }
+.asi-conf.alta { background: color-mix(in oklab, var(--verde) 32%, transparent); color: var(--verde); }
 .asi-conf.baja { background: color-mix(in oklab, var(--oro) 16%, transparent); color: var(--oro); }
 .asi-ident dl { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 8px; margin: 10px 0 0; }
 .asi-ident dt { font-size: 10px; font-weight: 800; letter-spacing: 0.05em; text-transform: uppercase; color: var(--muted-foreground); }
@@ -290,7 +295,7 @@
 .asi-pv a { display: inline-flex; gap: 6px; align-items: center; margin-top: 6px; font-size: 12px; font-weight: 700; color: var(--primary); text-decoration: none; }
 .asi-tag { display: inline-flex; align-items: center; gap: 4px; padding: 0 8px; border-radius: 999px; background: var(--muted); color: var(--muted-foreground); font-size: 10.5px; font-weight: 800; line-height: 19px; white-space: nowrap; }
 .asi-tag.oro { background: color-mix(in oklab, var(--oro) 17%, transparent); color: var(--oro); }
-.asi-tag.verde { background: color-mix(in oklab, var(--verde) 16%, transparent); color: var(--verde); }
+.asi-tag.verde { background: color-mix(in oklab, var(--verde) 32%, transparent); color: var(--verde); }
 .asi-tag.violeta { background: color-mix(in oklab, var(--viol) 15%, transparent); color: var(--viol); }
 .asi-alertas { margin: 12px 0 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 5px; }
 .asi-alertas li { font-size: 12px; color: color-mix(in oklab, var(--oro) 80%, var(--foreground)); }
@@ -386,3 +391,20 @@
     .asi-campo.corto { max-width: none; }
 }
 @media (prefers-reduced-motion: reduce) { .asi * { animation: none !important; transition: none !important; } }
+
+/* Avisos paso a paso del asistente: qué no se pudo completar, por qué y cómo resolverlo */
+.asi-avisos { display: flex; flex-direction: column; gap: 6px; margin-bottom: 8px; max-height: 190px; overflow-y: auto; }
+.asi-avisos[hidden] { display: none; }
+.asi-aviso { display: flex; gap: 10px; padding: 9px 12px; border: 1px solid; border-radius: 10px; font-size: 12.5px; line-height: 1.4; }
+.asi-aviso > i { margin-top: 2px; font-size: 15px; }
+.asi-aviso b { display: block; color: var(--foreground); }
+.asi-aviso p { margin: 2px 0 0; color: var(--muted-foreground); }
+.asi-aviso p.ayuda { color: var(--foreground); }
+.asi-aviso p.ayuda i { margin-right: 5px; color: #d97706; }
+.asi-aviso .acc { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.asi-aviso .acc:empty { display: none; }
+.asi-aviso.error { border-color: color-mix(in oklab, #dc2626 40%, var(--border)); background: color-mix(in oklab, #dc2626 7%, var(--card)); }
+.asi-aviso.error > i { color: #dc2626; }
+.asi-aviso.aviso { border-color: color-mix(in oklab, #d97706 40%, var(--border)); background: color-mix(in oklab, #d97706 8%, var(--card)); }
+.asi-aviso.aviso > i { color: #d97706; }
+.asi-aviso .asi-chip { height: auto; min-height: 28px; padding: 4px 12px; text-align: left; }

@@ -7,7 +7,7 @@
 <div id="dash" class="dash relative min-h-[calc(100vh-4rem)] overflow-x-clip">
     <div class="dash-aurora" aria-hidden="true"></div>
 
-    <div class="relative mx-auto max-w-[1600px] px-4 pt-6 pb-10 sm:px-6">
+    <div class="relative mx-auto max-w-[1600px] px-4 pt-6 pb-10 sm:px-6 min-[1900px]:max-w-[2000px] min-[2400px]:max-w-[2600px] min-[3000px]:max-w-[3200px]">
 
         {{-- Vista de negociadores ($soloComercial): la cabecera (saludo, fechas y periodo) se conserva SIEMPRE; solo se ocultan los
              insights y los KPIs generales, con style inline (las clases no bastan: .dash-insights define su propio display).
@@ -74,7 +74,14 @@
                 <div id="d-et-cuerpo">
                     <div class="et-stats" id="d-et-stats"></div>
                     <div class="et-main">
-                        <div class="relative h-[320px] min-w-0"><canvas id="c-etapa"></canvas></div>
+                        <div class="et-izq">
+                            <div class="relative h-[250px] min-w-0"><canvas id="c-etapa"></canvas></div>
+                            <div class="et-est" id="d-et-est">
+                                <div class="et-est-h"><i class="fa-solid fa-hourglass-half"></i><b>Antigüedad de los documentos activos</b><small id="d-et-est-n"></small></div>
+                                <div class="relative min-h-[170px] flex-1"><canvas id="c-estados"></canvas></div>
+                                <div class="et-est-ap" id="d-et-est-b"></div>
+                            </div>
+                        </div>
                         <div class="et-docs">
                             <div class="et-docs-h">
                                 <div class="et-salud" id="d-et-salud"></div>
@@ -89,15 +96,19 @@
             <section class="dash-card ag-card" id="d-act-card" style="--i:7">
                 <header class="dash-h">
                     <h2><i class="fa-solid fa-calendar-check text-primary"></i> Programador de actividades</h2>
+                    <div class="ag-ms hidden" id="d-act-ms"></div>
                     <button type="button" class="dash-btn dash-btn-pri" data-act-nueva><i class="fa-solid fa-plus"></i> Programar</button>
                 </header>
-                <div class="ag-resumen" id="d-act-resumen"></div>
-                <div class="dash-seg dash-seg-sm ag-tabs" id="d-act-tabs">
-                    <button type="button" data-vista="pendientes" class="on">Pendientes</button>
-                    <button type="button" data-vista="realizados">Realizadas</button>
-                    <button type="button" data-vista="historial">Mis seguimientos</button>
+                {{-- Una sola barra: los chips de color son los filtros (atrasadas, hoy, próximas, realizadas) y a la derecha el selector semana / mes. --}}
+                <div class="ag-barra">
+                    <div class="ag-resumen" id="d-act-resumen"></div>
+                    <div class="ag-modo" id="d-act-modo"></div>
                 </div>
-                <div class="ag-semana" id="d-act-semana"></div>
+                <div class="ag-fila" id="d-act-fila">
+                    <button type="button" class="ag-flecha" data-sem="-1" id="d-act-prev" title="Anterior" aria-label="Anterior"><i class="fa-solid fa-chevron-left"></i></button>
+                    <div class="ag-semana" id="d-act-semana"></div>
+                    <button type="button" class="ag-flecha" data-sem="1" id="d-act-next" title="Siguiente" aria-label="Siguiente"><i class="fa-solid fa-chevron-right"></i></button>
+                </div>
                 <div class="ag-lista" id="d-act-lista"><div class="ag-vacio"><i class="fa-solid fa-circle-notch fa-spin"></i></div></div>
             </section>
         </div>
@@ -146,6 +157,15 @@
     'urlColores' => $user->isAdmin() ? route('panel.dashboard.colores') : null,
     'urlActividades' => route('panel.actividades.index'),
     'urlPanelActividades' => route('panel.actividades.panel'),
+    'urlTareaForm' => route('panel.tareas.formulario'),
+    'urlTareaShow' => route('panel.tareas.show', ['tarea' => '__ID__']),
+    'urlTareaEstado' => route('panel.tareas.estado', ['tarea' => '__ID__']),
+    'urlMicrosoft' => route('panel.microsoft.estado'),
+    'urlMicrosoftConectar' => route('panel.microsoft.conectar'),
+    'urlMicrosoftPrefs' => route('panel.microsoft.preferencias'),
+    'urlMicrosoftSync' => route('panel.microsoft.sincronizar'),
+    'urlMicrosoftEventos' => route('panel.microsoft.eventos'),
+    'urlMicrosoftBase' => route('panel.microsoft.desconectar'),
     'csrf' => csrf_token(),
     'esAdmin' => (bool) $user->isAdmin(),
     'soloComercial' => (bool) $soloComercial,

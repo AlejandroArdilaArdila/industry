@@ -261,7 +261,9 @@ export class FichaModal {
 
         // Abre en el primer paso al que le falte algo obligatorio; si no, en el primero.
         const pendiente = this.esNuevo ? null : this.forms.find((f) => this.faltantes(f, '[data-required]').length > 0);
-        this.irA((pendiente ?? this.forms[0]).dataset.step);
+        // Vistas sin formulario por pasos (p. ej. el detalle de una tarea) no tienen paso al que ir.
+        const inicial = pendiente ?? this.forms[0];
+        if (inicial) this.irA(inicial.dataset.step);
     }
 
     /** En modo creación solo el primer paso está disponible hasta que se crea el registro. */

@@ -3,8 +3,10 @@
 namespace App\Http\Controllers\Panel;
 
 use App\Http\Controllers\Controller;
+use App\Services\Microsoft\MicrosoftSyncService;
 use App\Services\Panel\ActividadesService;
 use App\Services\Panel\PanelDashboardService;
+use App\Services\Panel\TareasService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -14,7 +16,7 @@ use InvalidArgumentException;
 /** Programador de actividades del dashboard: recordatorios y seguimientos de solicitudes, cotizaciones y órdenes. */
 class ActividadesController extends Controller
 {
-    public function __construct(private ActividadesService $actividades, private PanelDashboardService $dashboard)
+    public function __construct(private ActividadesService $actividades, private PanelDashboardService $dashboard, private MicrosoftSyncService $microsoft, private TareasService $tareas)
     {
     }
 
@@ -29,10 +31,20 @@ class ActividadesController extends Controller
         $usuario = $this->usuario();
 
         if ($vista === 'historial') {
-            return response()->json(['vista' => $vista, 'items' => $this->actividades->misSeguimientos($usuario)] + ['resumen' => $this->actividades->recordatorios($usuario, 'pendientes', 1)['resumen']]);
+            $r = $this->actividades->recordatorios($usuario, 'pendientes', 1)['resumen'];
+            $t = $this->tareas->resumen($usuario);
+
+            return response()->json(['vista' => $vista, 'items' => $this->actividades->misSeguimientos($usuario), 'resumen' => array_map(fn ($k) => (int) $r[$k] + $t[$k], array_combine(array_keys($r), array_keys($r)))]);
         }
 
-        return response()->json(['vista' => $vista] + $this->actividades->recordatorios($usuario, $vista === 'realizados' ? 'realizados' : 'pendientes'));
+        // Recordatorios de seguimientos (actioncomm) + tareas (solubitacora_tareas), en una sola lista.
+        $estado = $vista === 'realizados' ? 'realizados' : 'pendientes';
+        $r = $this->actividades->recordatorios($usuario, $estado);
+        $items = array_merge($r['items'], $this->tareas->items($usuario, $estado));
+        usort($items, fn ($a, $b) => $estado === 'pendientes' ? strcmp($a['cuando'], $b['cuando']) : strcmp($b['cuando'], $a['cuando']));
+        $t = $this->tareas->resumen($usuario);
+
+        return response()->json(['vista' => $vista, 'items' => $items, 'resumen' => array_map(fn ($k) => (int) $r['resumen'][$k] + $t[$k], array_combine(array_keys($r['resumen']), array_keys($r['resumen'])))]);
     }
 
     public function documentos(Request $request): JsonResponse
@@ -72,8 +84,10 @@ class ActividadesController extends Controller
             'doc' => $doc,
             'cliente' => $doc ? $this->actividades->resumenCliente((int) $doc['fkSoc']) : null,
             'detalle' => $doc ? $this->actividades->detalleDocumento($modulo, $id) : null,
+            'relacionados' => $doc ? $this->relacionadosSeguros($modulo, $id) : [],
             'historial' => $historial,
             'fijo' => $request->boolean('fijo'),
+            'ms' => $this->microsoft->estado((int) $this->usuario()->getKey()),
             'colores' => $this->dashboard->coloresEtapas(),
         ])->render();
 
@@ -91,6 +105,7 @@ class ActividadesController extends Controller
             'fecha' => ['nullable', 'required_if:programar,1', 'date_format:Y-m-d', 'after_or_equal:'.$hoy],
             'hora' => ['nullable', 'required_if:programar,1', 'date_format:H:i'],
             'titulo' => ['nullable', 'required_if:programar,1', 'string', 'max:255'],
+            'teams' => ['nullable', 'boolean'],
         ], [
             'observacion.required' => 'Escribe la observación.',
             'fecha.required_if' => 'Indica la fecha del próximo contacto.',
@@ -108,7 +123,11 @@ class ActividadesController extends Controller
             abort(403, $e->getMessage());
         }
 
-        return response()->json(['ok' => true, 'message' => $r['evento'] ? 'Seguimiento y recordatorio guardados' : 'Seguimiento guardado'] + $r);
+        // Office 365 (si el usuario lo conectó): evento de Outlook, tarea de To Do y reunión de Teams. Nunca bloquea el guardado.
+        $ms = $r['evento'] ? $this->microsoft->empujarCreado((int) $this->usuario()->getKey(), (int) $r['evento'], array_key_exists('teams', $datos) ? (bool) $datos['teams'] : null) : [];
+        $extra = ! empty($ms['calendario']) || ! empty($ms['tarea']) ? ' · sincronizado con Office 365' : '';
+
+        return response()->json(['ok' => true, 'message' => ($r['evento'] ? 'Seguimiento y recordatorio guardados' : 'Seguimiento guardado').$extra, 'microsoft' => $ms] + $r);
     }
 
     public function estado(Request $request, int $evento): JsonResponse
@@ -124,6 +143,20 @@ class ActividadesController extends Controller
             abort(404, $e->getMessage());
         }
 
+        $this->microsoft->empujarEstado($evento, $datos['estado'] === 'REALIZADO');
+
         return response()->json(['ok' => true, 'message' => $datos['estado'] === 'REALIZADO' ? 'Actividad marcada como realizada' : 'Actividad reabierta']);
+    }
+
+    /** Los documentos relacionados son un extra: si algo falla no debe tumbar el panel. */
+    private function relacionadosSeguros(string $modulo, int $id): array
+    {
+        try {
+            return $this->actividades->relacionados($modulo, $id);
+        } catch (\Throwable $e) {
+            report($e);
+
+            return [];
+        }
     }
 }

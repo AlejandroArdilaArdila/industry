@@ -10,7 +10,7 @@ use Illuminate\Support\Facades\DB;
  */
 class SolicitudCorreoIaService
 {
-    private const ETIQUETAS = '<p><br><strong><b><em><i><u><ul><ol><li><a><h3><h4>';
+    private const ETIQUETAS = '<p><br><strong><b><em><i><u><ul><ol><li><a><h3><h4><hr>';
 
     public function __construct(private IaClient $ia, private IaConfigService $config, private SolicitudPromptsService $prompts)
     {
@@ -22,7 +22,7 @@ class SolicitudCorreoIaService
      *
      * @throws IaException
      */
-    public function redactar(object $usuario, object $sol, array $lineas, ?string $base, ?string $instrucciones, bool $firmaAutomatica = false): array
+    public function redactar(object $usuario, object $sol, array $lineas, ?string $base, ?string $instrucciones, bool $firmaAutomatica = false, string $clave = 'correo', array $extra = []): array
     {
         $p = DB::getTablePrefix();
         $contacto = DB::selectOne("SELECT TRIM(CONCAT_WS(' ', firstname, lastname)) n FROM {$p}socpeople WHERE rowid = ?", [$sol->contacto_id])->n ?? null;
@@ -43,7 +43,8 @@ class SolicitudCorreoIaService
             'instrucciones_del_asesor' => $instrucciones !== null && trim($instrucciones) !== '' ? mb_substr(trim($instrucciones), 0, 1000) : null,
         ];
 
-        $texto = $this->ia->chat($this->config->predeterminado(), $this->prompts->sistema('correo'), [['role' => 'user', 'content' => json_encode($contexto, JSON_UNESCAPED_UNICODE)]], false);
+        $contexto = array_filter($contexto + $extra, fn ($v) => $v !== null);
+        $texto = $this->ia->chat($this->config->predeterminado(), $this->prompts->sistema($clave), [['role' => 'user', 'content' => json_encode($contexto, JSON_UNESCAPED_UNICODE)]], false);
         $ini = strpos($texto, '{');
         $fin = strrpos($texto, '}');
         $json = $ini !== false && $fin !== false ? json_decode(substr($texto, $ini, $fin - $ini + 1), true) : null;

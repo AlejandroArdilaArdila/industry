@@ -31,9 +31,13 @@ return Application::configure(basePath: dirname(__DIR__))
         foreach (['07:00', '12:30'] as $hora) {
             $schedule->command('trm:cargar')->dailyAt($hora)->timezone('America/Bogota')->withoutOverlapping();
         }
+        // Office 365: cambios hechos en Outlook / To Do y renovación de suscripciones (el webhook da la inmediatez; esto es el respaldo).
+        $schedule->command('microsoft:sincronizar')->everyFiveMinutes()->withoutOverlapping();
     })
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->prepend(TrimTrailingSlash::class);
+        // Webhook de Microsoft Graph: lo llama Microsoft, sin sesión ni token CSRF (se valida con clientState).
+        $middleware->validateCsrfTokens(except: ['microsoft/webhook']);
 
         if (env('PANEL_ENABLED', true)) {
             // Sesión cerrada/expirada: al login con el motivo (y la página pedida queda como "intended").

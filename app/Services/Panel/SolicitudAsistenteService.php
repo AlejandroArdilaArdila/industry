@@ -392,8 +392,10 @@ class SolicitudAsistenteService
         .'Ejemplo: «para el cliente BAVARIA & CIA S C A el producto BANDA MODULAR MCC FG500XLG B=1020 SERIE 500 y MEDIDOR DE FLUJO KROHNE MODELO BATCHFLUX 5500C para el contacto LUIS ALEXANDER ALFONSO» → '
         .'cliente "BAVARIA & CIA S C A", contacto "LUIS ALEXANDER ALFONSO", elementos [{"referencia":"FG500XLG B=1020 SERIE 500","nombre":"Banda modular MCC","descripcion":"","cantidad":1},'
         .'{"referencia":"BATCHFLUX 5500C","nombre":"Medidor de flujo Krohne","descripcion":"","cantidad":1}]. '
-        .'Responde SOLO con JSON: {"cliente":null,"contacto":null,"elementos":[{"referencia":"","nombre":"","descripcion":"","cantidad":1}],"modo_elementos":"agregar","asunto":null,"dias_proximo_contacto":null,"mensaje":""}. '
-        .'"modo_elementos" es "reemplazar" solo si el asesor pide cambiar o rehacer los productos; si no, "agregar". "mensaje" es una confirmación de una frase en español de lo que entendiste; llama «piezas» a los productos.';
+        .'Responde SOLO con JSON: {"cliente":null,"contacto":null,"elementos":[{"referencia":"","nombre":"","descripcion":"","cantidad":1}],"modo_elementos":"agregar","asunto":null,"dias_proximo_contacto":null,"mensaje":"","sugerencia":""}. '
+        .'"modo_elementos" es "reemplazar" solo si el asesor pide cambiar o rehacer los productos; si no, "agregar". "mensaje" es una confirmación de una frase en español de lo que entendiste; llama «piezas» a los productos. '
+        .'"sugerencia": si el cliente, el contacto o los productos NO quedaron claros (faltan, son ambiguos o el texto es confuso) y el estado actual no los tiene ya, reescribe en una sola frase cómo debería decirlo el asesor, usando lo que sí dijo y '
+        .'marcadores entre corchetes para lo que falte (ej. «para el cliente [NOMBRE DEL CLIENTE] el producto BANDA MODULAR MCC con referencia [REFERENCIA] para el contacto [NOMBRE Y APELLIDO]»); si todo quedó claro, déjala vacía.';
 
     /**
      * Entiende un texto libre (escrito o dictado) y lo convierte en datos de la solicitud: cliente (buscado en la base),
@@ -443,6 +445,7 @@ class SolicitudAsistenteService
             'asunto' => $txt($j['asunto'] ?? '', 150) ?: null,
             'dias_proximo_contacto' => $dias,
             'mensaje' => $txt($j['mensaje'] ?? '', 300),
+            'sugerencia' => $txt($j['sugerencia'] ?? '', 500),
         ];
     }
 

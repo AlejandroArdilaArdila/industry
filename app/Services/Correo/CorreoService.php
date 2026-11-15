@@ -31,6 +31,7 @@ class CorreoService
         ?string $email,
         string $asunto,
         string $cuerpo,
+        array $cc = [],
     ): array {
         $email = trim((string) $email);
         $asunto = trim($asunto);
@@ -82,6 +83,9 @@ class CorreoService
             ->to(...$destinatarios)
             ->subject($asunto)
             ->html($cuerpo);
+        if ($cc) {
+            $mensaje->cc(...$cc);
+        }
 
         $adjuntoPdf = false;
 

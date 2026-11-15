@@ -3,6 +3,7 @@
 namespace App\Services\Panel;
 
 use App\Models\Configuracion;
+use App\Services\Panel\SolicitudesTableroService;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -186,6 +187,43 @@ class PanelDashboardService
                         COALESCE(SUM(DATEDIFF(NOW(), {$def['refFecha']}) BETWEEN {$umb[$meta['card']]['riesgoMin']} AND {$umb[$meta['card']]['riesgoMax']}),0) riesgo
                     FROM {$def['from']} WHERE {$def['activo']} AND {$ventanaW}{$duenio}", $vb);
 
+                // Reparto por estado de los documentos activos (para la dona de la etapa).
+                $porEstado = $clave === 'entrega'
+                    ? DB::select("SELECT COALESCE(NULLIF(t.estado,''), 'Sin estado') k, COUNT(*) n FROM {$def['from']} WHERE {$def['activo']} AND {$ventanaW}{$duenio} GROUP BY k ORDER BY n DESC", $vb)
+                    : DB::select("SELECT t.status k, COUNT(*) n FROM {$def['from']} WHERE {$def['activo']} AND {$ventanaW}{$duenio} GROUP BY k ORDER BY n DESC", $vb);
+                $estadosEtapa = array_map(fn ($r) => ['estado' => $clave === 'entrega' ? ucfirst(mb_strtolower((string) $r->k)) : ActividadesService::nombreEstado($def['modulo'], (int) $r->k), 'n' => (int) $r->n], $porEstado);
+
+                // Antigüedad de los documentos activos por rangos de días (desde su fecha de referencia).
+                $rangos = [[0, 15, '1-15 d'], [16, 30, '16-30 d'], [31, 60, '31-60 d'], [61, 90, '61-90 d'], [91, 180, '91-180 d'], [181, null, '+180 d']];
+                $diasSql = "DATEDIFF(NOW(), {$def['refFecha']})";
+                $cols = implode(', ', array_map(fn ($r, $i) => "COALESCE(SUM($diasSql >= {$r[0]}".($r[1] !== null ? " AND $diasSql <= {$r[1]}" : '').") ,0) r$i", $rangos, array_keys($rangos)));
+                $fila = DB::selectOne("SELECT $cols FROM {$def['from']} WHERE {$def['activo']} AND {$ventanaW}{$duenio}", $vb);
+                $antiguedad = array_map(fn ($r, $i) => ['etq' => $r[2], 'min' => $r[0], 'max' => $r[1], 'n' => (int) ($fila->{"r$i"} ?? 0)], $rangos, array_keys($rangos));
+
+                // Resumen por nivel de mora (con la más antigua y la más nueva de cada uno) para la tarjeta de la pestaña.
+                // Las solicitudes usan, en cambio, los grupos del tablero.
+                $resumen = null;
+                if ($clave === 'solicitud') {
+                    $resumen = app(SolicitudesTableroService::class)->conteos($uid ?: null);
+                } else {
+                    $u = $umb[$meta['card']];
+                    $dias = "DATEDIFF(NOW(), {$def['refFecha']})";
+                    $refCol = $clave === 'entrega' ? 'o.ref' : 't.ref';
+                    $docCol = $clave === 'entrega' ? 'o.rowid' : 't.rowid';
+                    $niveles = [
+                        'mora' => ['En mora', "$dias >= ".(int) $u['mora']],
+                        'riesgo' => ['En riesgo', "$dias BETWEEN ".(int) $u['riesgoMin'].' AND '.(int) $u['riesgoMax']],
+                        'aldia' => ['Al día', "$dias < ".(int) $u['mora']." AND $dias NOT BETWEEN ".(int) $u['riesgoMin'].' AND '.(int) $u['riesgoMax']],
+                    ];
+                    $resumen = [];
+                    foreach ($niveles as $k => [$titulo, $cond]) {
+                        $n = $k === 'aldia' ? max(0, (int) $activos->n - (int) $activos->mora - (int) $activos->riesgo) : (int) $activos->{$k};
+                        $extremo = fn (string $orden) => ($f = DB::selectOne("SELECT {$docCol} id, {$refCol} ref, {$def['refFecha']} fecha, {$dias} dias FROM {$def['from']} WHERE {$def['activo']} AND {$ventanaW}{$duenio} AND {$cond} ORDER BY {$def['refFecha']} {$orden}, {$docCol} {$orden} LIMIT 1", $vb))
+                            ? ['id' => (int) $f->id, 'ref' => $f->ref, 'fecha' => substr((string) $f->fecha, 0, 10), 'dias' => max(0, (int) $f->dias)] : null;
+                        $resumen[] = ['clave' => $k, 'titulo' => $titulo, 'color' => $u['colores'][$k], 'n' => $n, 'masAntigua' => $n ? $extremo('ASC') : null, 'masNueva' => $n ? $extremo('DESC') : null];
+                    }
+                }
+
                 $consulta = function (Carbon $a, Carbon $z, string $fmt) use ($def, $duenio, $uid) {
                     $bb = [$a->toDateString(), $z->toDateString()];
                     if ($uid) {
@@ -204,6 +242,9 @@ class PanelDashboardService
                     'etiquetaActivos' => $meta['activos'],
                     'colores' => $colores[$meta['card']],
                     'activos' => (int) $activos->n,
+                    'estados' => $estadosEtapa,
+                    'antiguedad' => $antiguedad,
+                    'resumen' => $resumen,
                     'mora' => ['mora' => (int) $activos->mora, 'riesgo' => (int) $activos->riesgo, 'aldia' => max(0, (int) $activos->n - (int) $activos->mora - (int) $activos->riesgo), 'umbral' => $umb[$meta['card']]['mora'], 'colores' => $umb[$meta['card']]['colores']],
                     'valorActivo' => $def['valor'] ? round((float) $activos->v) : null,
                     'total' => array_sum($serie['cantidades']),
@@ -689,7 +730,7 @@ class PanelDashboardService
      *
      * @return array{items: array, total: int, umbral: int}
      */
-    public function documentosEtapa(object $usuario, string $clave, string $periodo, bool $todos, string $q = '', int $limite = 40): array
+    public function documentosEtapa(object $usuario, string $clave, string $periodo, bool $todos, string $q = '', int $limite = 40, string $nivel = ''): array
     {
         abort_unless(isset(self::ETAPAS[$clave]), 422, 'Etapa inválida.');
         $periodo = array_key_exists($periodo, self::PERIODOS) ? $periodo : '30';
@@ -706,6 +747,14 @@ class PanelDashboardService
             $w .= " AND {$def['duenio']} = ?";
             $b[] = $uid;
         }
+        // Filtro por nivel de mora (En mora / En riesgo / Al día), con los mismos cortes que el resumen.
+        $dias = "DATEDIFF(NOW(), {$def['refFecha']})";
+        $w .= match ($nivel) {
+            'mora' => " AND $dias >= ".(int) $umb['mora'],
+            'riesgo' => " AND $dias BETWEEN ".(int) $umb['riesgoMin'].' AND '.(int) $umb['riesgoMax'],
+            'aldia' => " AND $dias < ".(int) $umb['mora']." AND $dias NOT BETWEEN ".(int) $umb['riesgoMin'].' AND '.(int) $umb['riesgoMax'],
+            default => '',
+        };
         if (trim($q) !== '') {
             $like = '%'.str_replace(['\\', '%', '_'], ['\\\\', '\%', '\_'], trim($q)).'%';
             $refCol = $clave === 'entrega' ? 'o.ref' : 't.ref';
@@ -716,10 +765,10 @@ class PanelDashboardService
         $total = (int) DB::selectOne("SELECT COUNT(*) n FROM {$def['from']} LEFT JOIN {$p}societe s ON s.rowid = {$def['socio']} WHERE {$w}", $b)->n;
 
         $campos = match ($clave) {
-            'solicitud' => "t.rowid id, t.rowid doc, t.ref, t.status, t.asunto titulo, t.total_ttc valor",
-            'cotizacion' => "t.rowid id, t.rowid doc, t.ref, t.status, t.label titulo, {$def['valor']} valor",
-            'orden' => "t.rowid id, t.rowid doc, t.ref, t.status, t.asunto titulo, {$def['valor']} valor",
-            default => "t.rowid id, o.rowid doc, o.ref, 0 status, CONCAT_WS(' · ', NULLIF(t.transporte,''), NULLIF(t.guia,''), NULLIF(t.estado,'')) titulo, NULL valor",
+            'solicitud' => "t.rowid id, t.rowid doc, t.ref, t.status, t.asunto titulo, t.total_ttc valor, t.fecha_proximo_contacto proximo",
+            'cotizacion' => "t.rowid id, t.rowid doc, t.ref, t.status, t.label titulo, {$def['valor']} valor, NULL proximo",
+            'orden' => "t.rowid id, t.rowid doc, t.ref, t.status, t.asunto titulo, {$def['valor']} valor, NULL proximo",
+            default => "t.rowid id, o.rowid doc, o.ref, 0 status, CONCAT_WS(' · ', NULLIF(t.transporte,''), NULLIF(t.guia,''), NULLIF(t.estado,'')) titulo, NULL valor, NULL proximo",
         };
         $rows = DB::select("SELECT {$campos}, DATEDIFF(NOW(), {$def['refFecha']}) dias, {$def['refFecha']} fecha, s.nom empresa, TRIM(CONCAT_WS(' ', u.firstname, u.lastname)) gestor
             FROM {$def['from']} LEFT JOIN {$p}societe s ON s.rowid = {$def['socio']} LEFT JOIN {$p}user u ON u.rowid = {$def['duenio']}
@@ -750,7 +799,7 @@ class PanelDashboardService
             'items' => array_map(fn ($r) => [
                 'id' => (int) $r->id, 'doc' => (int) $r->doc, 'modulo' => $def['modulo'], 'ref' => $r->ref, 'empresa' => $r->empresa ?: 'Sin empresa', 'gestor' => $r->gestor,
                 'titulo' => mb_strimwidth(trim(preg_replace('/\s+/', ' ', strip_tags(html_entity_decode((string) $r->titulo)))), 0, 110, '…'), 'valor' => $r->valor ? round((float) $r->valor) : null,
-                'estado' => $clave === 'entrega' ? null : ($estados[$clave][(int) $r->status] ?? null), 'dias' => max(0, (int) $r->dias),
+                'estado' => $clave === 'entrega' ? null : ($estados[$clave][(int) $r->status] ?? null), 'dias' => max(0, (int) $r->dias), 'proximo' => $r->proximo ? substr((string) $r->proximo, 0, 10) : null, 'desde' => $r->fecha ? substr((string) $r->fecha, 0, 10) : null,
                 'nivel' => $this->nivelMora(max(0, (int) $r->dias), $umb), 'clasif' => $clasif[(int) $r->doc] ?? [],
             ], $rows),
         ];

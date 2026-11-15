@@ -33,8 +33,21 @@
                         @if ($e['id'] !== 9)<option value="{{ $e['id'] }}">{{ $e['nombre'] }}</option>@endif
                     @endforeach
                 </select>
+                <div class="kb-vista kb-fechas" role="group" aria-label="Filtrar por fecha de creación" data-kb-fechas>
+                    <button type="button" data-rango="" class="on">Todo</button>
+                    <button type="button" data-rango="1">Último mes</button>
+                    <button type="button" data-rango="3">3 meses</button>
+                    <button type="button" data-rango="6">6 meses</button>
+                    <button type="button" data-rango="rango">Rango</button>
+                </div>
+                <div class="kb-rango" data-kb-rango hidden>
+                    <input type="date" data-kb-desde aria-label="Desde"><span>–</span><input type="date" data-kb-hasta aria-label="Hasta">
+                </div>
                 <div class="espacio">
                     <button type="button" class="kb-btn" data-kb-recargar title="Recargar"><i class="fa-solid fa-rotate"></i></button>
+                    @if (auth('web')->user()?->isAdmin())
+                        <button type="button" class="kb-btn" data-kb-config title="Configurar las columnas: estados y condiciones de cada grupo"><i class="fa-solid fa-sliders"></i></button>
+                    @endif
                     <button type="button" class="kb-btn asistente" data-kb-asistente title="Crear la solicitud conversando: cliente, contacto, elemento, historial y análisis con IA"><i class="fa-solid fa-wand-magic-sparkles"></i>Crear con asistente</button>
                     <button type="button" class="kb-btn primario" data-kb-nueva><i class="fa-solid fa-plus"></i>Nueva</button>
                     <div class="kb-vista" role="group" aria-label="Vista">
@@ -86,10 +99,17 @@
             tablero: {
                 columnas: @json($tablero['columnas']),
                 estados: @json($tablero['estados']),
+                estadosTablero: @json($tablero['estadosTablero']),
+                columnasUrl: @json(route('panel.solicitudes.tablero.columnas.guardar')),
                 columnaUrl: @json(route('panel.solicitudes.tablero.columna', '__COL__')),
                 motivosUrl: @json(route('panel.solicitudes.tablero.motivos')),
                 moverUrl: @json(route('panel.solicitudes.mover', '__ID__')),
                 seguimientoUrl: @json(route('panel.actividades.store')),
+                seguimientoUrls: {
+                    ctx: @json(route('panel.solicitudes.seguimiento.contexto', '__ID__')),
+                    guardar: @json(route('panel.solicitudes.seguimiento.guardar', '__ID__')),
+                    ia: @json(route('panel.solicitudes.seguimiento.ia', '__ID__')),
+                },
             },
         };
     </script>

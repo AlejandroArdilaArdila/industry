@@ -9,6 +9,7 @@ use App\Services\Panel\ActividadesService;
 use App\Services\Panel\PanelDashboardService;
 use App\Services\Panel\SolicitudFichaService;
 use App\Services\Panel\SolicitudProductosIaService;
+use App\Services\Panel\SolicitudSeguimientoService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -165,6 +166,61 @@ class SolicitudFichaController extends Controller
         ]);
         try {
             $correo = $ia->redactar($this->usuario(), $sol, $d['lineas'] ?? [], $d['base'] ?? null, $d['instrucciones'] ?? null);
+        } catch (IaException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
+
+        return response()->json(['ok' => true] + $correo);
+    }
+
+    /** Datos para el formulario de seguimiento: contactos con correo, plantillas, firma y últimos seguimientos. */
+    public function seguimientoContexto(int $solicitud, SolicitudSeguimientoService $seg): JsonResponse
+    {
+        $sol = $this->cargar($solicitud);
+
+        return response()->json(['ok' => true] + $seg->contexto($this->usuario(), $sol));
+    }
+
+    /** Guarda el seguimiento (y programa el próximo contacto); con «enviar», manda además el correo al cliente. */
+    public function seguimientoGuardar(Request $request, int $solicitud, SolicitudSeguimientoService $seg): JsonResponse
+    {
+        $sol = $this->cargar($solicitud);
+        abort_unless($this->servicio->puedeEditar($this->usuario()), 403, 'No tienes permiso para registrar seguimientos.');
+        $d = $request->validate([
+            'observacion' => 'nullable|string|max:5000',
+            'fecha' => 'nullable|date_format:Y-m-d',
+            'hora' => 'nullable|date_format:H:i',
+            'enviar' => 'nullable|boolean',
+            'para' => 'nullable|array|max:20',
+            'para.*' => 'string|max:200',
+            'cc' => 'nullable|string|max:500',
+            'asunto' => 'nullable|string|max:250',
+            'cuerpo' => 'nullable|string|max:60000',
+            'incluir_firma' => 'nullable|boolean',
+        ]);
+        set_time_limit(60);
+        try {
+            return response()->json(['ok' => true] + $seg->registrar($this->usuario(), $sol, $d));
+        } catch (InvalidArgumentException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
+    }
+
+    /** Redacta con IA el correo de seguimiento a partir de la nota del asesor, los productos y los últimos seguimientos. */
+    public function seguimientoIa(Request $request, int $solicitud, SolicitudCorreoIaService $ia, SolicitudSeguimientoService $seg): JsonResponse
+    {
+        $sol = $this->cargar($solicitud);
+        abort_unless($this->servicio->puedeEditar($this->usuario()), 403, 'No tienes permiso para esta acción.');
+        $d = $request->validate(['nota' => 'nullable|string|max:5000', 'instrucciones' => 'nullable|string|max:1000', 'contacto_id' => 'nullable|integer']);
+        $lineas = array_map(fn ($l) => ['description' => strip_tags((string) ($l->description ?: $l->label)), 'model' => $l->model, 'qty' => $l->qty],
+            \Illuminate\Support\Facades\DB::select('SELECT label, description, model, qty FROM '.\Illuminate\Support\Facades\DB::getTablePrefix().'solicitudes_solicitudline WHERE fk_solicitud = ? AND fk_cotizacion IS NULL ORDER BY rang, rowid LIMIT 40', [$sol->rowid]));
+        if (! empty($d['contacto_id'])) {
+            $sol->contacto_id = $d['contacto_id'];
+        }
+        $ultimos = array_column($seg->contexto($this->usuario(), $sol)['ultimos'], 'texto');
+        set_time_limit(90);
+        try {
+            $correo = $ia->redactar($this->usuario(), $sol, $lineas, $d['nota'] ?? null, $d['instrucciones'] ?? null, true, 'seguimiento', ['ultimos_seguimientos' => $ultimos ?: null]);
         } catch (IaException $e) {
             return response()->json(['message' => $e->getMessage()], 422);
         }

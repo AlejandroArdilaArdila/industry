@@ -19,7 +19,7 @@ class PerfilUsuarioService
         'address', 'zip', 'town', 'fk_state', 'fk_country', 'birth', 'civility', 'gender',
     ];
 
-    private const CAMPOS_SOLO_ADMIN = ['statut', 'admin', 'employee'];
+    private const CAMPOS_SOLO_ADMIN = ['login', 'statut', 'admin', 'employee'];
 
     /**
      * @return array<string, array<int, string>>

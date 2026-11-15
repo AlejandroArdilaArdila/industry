@@ -9,7 +9,7 @@ const $ = (id) => document.getElementById(id);
 export function iniciarEtapas({ url, urlDocumentos, getPeriodo, esAdmin, onAbrir }) {
     const e = {
         datos: null, idx: 0, restante: ROTACION_MS, manual: matchMedia('(prefers-reduced-motion: reduce)').matches,
-        encima: false, visible: true, metrica: 'cantidad', alcance: 'todos', chart: null, ctrl: null,
+        encima: false, visible: true, metrica: 'cantidad', alcance: 'todos', chart: null, ctrl: null, nivel: {},
     };
     const docs = { cache: new Map(), seq: 0, q: '', espera: null };
     const card = $('d-etapas-card');
@@ -19,7 +19,7 @@ export function iniciarEtapas({ url, urlDocumentos, getPeriodo, esAdmin, onAbrir
     const anilloFg = anillo.querySelector('.fg');
     const anilloTxt = anillo.querySelector('span');
 
-    const pausado = () => e.manual || e.encima || !e.visible || document.hidden || !e.datos;
+    const pausado = () => e.manual || e.encima || !e.visible || document.hidden || !e.datos || Object.values(e.nivel).some(Boolean);
 
     function delta(act, prev) {
         if (!prev) return act ? '<span class="chip">Nuevo</span>' : '';
@@ -32,8 +32,39 @@ export function iniciarEtapas({ url, urlDocumentos, getPeriodo, esAdmin, onAbrir
             <button type="button" role="tab" class="et-tab" data-i="${i}" aria-selected="false" style="--c:${x.colores.fondo};--t:${x.colores.texto};--a:${x.colores.acento}">
                 <span class="et-lbl">${esc(x.nombre)}</span>
                 <span class="et-num">${nf.format(x.activos)}<small>${esc(x.etiquetaActivos.toLowerCase())}</small></span>
+                ${x.resumen ? `<span class="et-mini" tabindex="0" data-resumen="${i}">${x.resumen.map((r) => `<span><i style="background:${r.color}"></i>${nf.format(r.n)}</span>`).join('')}</span>` : ''}
             </button>`).join('');
     }
+
+    // Tarjeta flotante con el resumen de solicitudes por grupo: cuántas hay y la más antigua y la más nueva de cada una.
+    let pop = null;
+    const cerrarPop = () => { pop?.remove(); pop = null; };
+    function abrirPop(ancla, etapa) {
+        cerrarPop();
+        const resumen = etapa.resumen;
+        const esSol = etapa.clave === 'solicitud';
+        const dias = (d) => `${nf.format(d)} ${d === 1 ? 'día' : 'días'}`;
+        const fila = (rot, x) => (x ? `<div class="et-pop-r"><span>${rot}</span><b>${esc(x.ref)}</b><em>${dias(x.dias)}</em></div>` : '');
+        pop = document.createElement('div');
+        pop.className = 'et-pop';
+        pop.innerHTML = `<header><i class="fa-solid ${esSol ? 'fa-inbox' : 'fa-clock'}"></i><div><b>${esSol ? 'Solicitudes por grupo' : `${esc(etapa.nombre)} por mora`}</b><small>${esSol ? 'Como en el tablero · antigüedad desde la creación' : `En mora desde ${etapa.mora.umbral} días · antigüedad del documento`}</small></div></header>
+            ${resumen.map((r) => `<section style="--k:${r.color}"><h5><i></i>${esc(r.titulo)}<span>${nf.format(r.n)}</span></h5>
+                ${r.n ? fila('Más antigua', r.masAntigua) + fila('Más nueva', r.masNueva) : '<p>Sin documentos</p>'}</section>`).join('')}`;
+        document.body.appendChild(pop);
+        const a = ancla.getBoundingClientRect();
+        const w = pop.offsetWidth;
+        pop.style.left = `${Math.max(8, Math.min(a.left, innerWidth - w - 8))}px`;
+        const abajo = a.bottom + 8;
+        pop.style.top = `${abajo + pop.offsetHeight > innerHeight - 8 ? Math.max(8, a.top - pop.offsetHeight - 8) : abajo}px`;
+    }
+    $('d-et-tabs').addEventListener('mouseover', (ev) => {
+        const m = ev.target.closest('[data-resumen]');
+        if (m && e.datos) abrirPop(m, e.datos.etapas[Number(m.dataset.resumen)]);
+    });
+    $('d-et-tabs').addEventListener('mouseout', (ev) => { if (ev.target.closest('[data-resumen]') && !ev.relatedTarget?.closest?.('[data-resumen]')) cerrarPop(); });
+    $('d-et-tabs').addEventListener('focusin', (ev) => { const m = ev.target.closest('[data-resumen]'); if (m && e.datos) abrirPop(m, e.datos.etapas[Number(m.dataset.resumen)]); });
+    $('d-et-tabs').addEventListener('focusout', cerrarPop);
+    addEventListener('scroll', cerrarPop, true);
 
     function pintarEtapa(animar = true) {
         const x = e.datos.etapas[e.idx];
@@ -70,8 +101,55 @@ export function iniciarEtapas({ url, urlDocumentos, getPeriodo, esAdmin, onAbrir
             cuerpo.classList.add('et-cambia');
         }
         dibujar(x);
+        dibujarEstados(x);
         pintarSalud(x);
         cargarDocs(x);
+    }
+
+    // Antigüedad de los documentos activos (columnas por rango de días, de verde a rojo) y, debajo, el reparto por estado.
+    const ESCALA = ['#16a34a', '#84cc16', '#f59e0b', '#f97316', '#ef4444', '#b91c1c'];
+    const PALETA = ['#2563eb', '#f59e0b', '#10b981', '#8b5cf6', '#ef4444', '#06b6d4', '#ec4899', '#84cc16', '#64748b'];
+    function dibujarEstados(x) {
+        const rangos = x.antiguedad ?? [];
+        const total = rangos.reduce((a, r) => a + r.n, 0);
+        const txt = colorTema('--muted-foreground');
+        $('d-et-est-n').textContent = total ? `${nf.format(total)} activos` : '';
+        e.chartEst?.destroy();
+        e.chartEst = new Chart($('c-estados'), {
+            type: 'bar',
+            data: { labels: rangos.map((r) => r.etq), datasets: [{ data: rangos.map((r) => r.n), backgroundColor: ESCALA, borderRadius: 8, borderSkipped: false, barPercentage: 0.78, categoryPercentage: 0.9 }] },
+            options: {
+                indexAxis: 'y', maintainAspectRatio: false, animation: { duration: 800, easing: 'easeOutQuart' }, layout: { padding: { right: 42 } },
+                scales: {
+                    x: { beginAtZero: true, grid: { color: alfa(txt, 14) }, border: { display: false }, ticks: { color: txt, maxTicksLimit: 5, precision: 0 } },
+                    y: { grid: { display: false }, border: { display: false }, ticks: { color: txt, font: { weight: 600 } } },
+                },
+                plugins: {
+                    legend: { display: false },
+                    tooltip: { callbacks: { title: (c) => `${c[0].label} de antigüedad`, label: (c) => ` ${nf.format(c.raw)} documentos (${total ? Math.round((c.raw / total) * 100) : 0}%)` } },
+                },
+            },
+            plugins: [{
+                id: 'valores',
+                afterDatasetsDraw(ch) {
+                    const { ctx } = ch;
+                    ctx.save();
+                    ctx.fillStyle = colorTema('--foreground');
+                    ctx.font = '700 11px sans-serif';
+                    ctx.textBaseline = 'middle';
+                    ch.getDatasetMeta(0).data.forEach((b, i) => {
+                        if (rangos[i].n) ctx.fillText(`${nf.format(rangos[i].n)} · ${total ? Math.round((rangos[i].n / total) * 100) : 0}%`, b.x + 6, b.y);
+                    });
+                    ctx.restore();
+                },
+            }],
+        });
+
+        // Reparto por estado en una sola barra apilada con chips.
+        const lista = x.estados ?? [];
+        const sum = lista.reduce((a, r) => a + r.n, 0);
+        $('d-et-est-b').innerHTML = sum ? `<div class="et-ap-barra">${lista.map((r, i) => `<i style="width:${(r.n / sum) * 100}%;background:${PALETA[i % PALETA.length]}" title="${esc(r.estado)}: ${nf.format(r.n)}"></i>`).join('')}</div>
+            <div class="et-ap-leyenda">${lista.slice(0, 5).map((r, i) => `<span title="${esc(r.estado)}"><i style="background:${PALETA[i % PALETA.length]}"></i>${esc(r.estado)} <b>${nf.format(r.n)}</b></span>`).join('')}${lista.length > 5 ? `<span>+${lista.length - 5} más</span>` : ''}</div>` : '';
     }
 
     function dibujar(x) {
@@ -119,13 +197,14 @@ export function iniciarEtapas({ url, urlDocumentos, getPeriodo, esAdmin, onAbrir
     // ---- salud (mora) y documentos de la etapa
     function pintarSalud(x) {
         const m = x.mora;
+        const sel = e.nivel[x.clave] || '';
         const tot = Math.max(1, m.mora + m.riesgo + m.aldia);
-        const seg = (k, texto) => (m[k] ? `<i style="width:${(m[k] / tot) * 100}%;background:${m.colores[k]}" title="${texto}: ${nf.format(m[k])}"></i>` : '');
+        const seg = (k, texto) => (m[k] ? `<i data-nivel="${k}" class="${sel && sel !== k ? 'tenue' : ''}" style="width:${(m[k] / tot) * 100}%;background:${m.colores[k]}" title="${texto}: ${nf.format(m[k])} · clic para filtrar"></i>` : '');
+        const item = (k, texto, tip = '') => `<button type="button" data-nivel="${k}" class="et-niv ${sel === k ? 'on' : ''} ${sel && sel !== k ? 'tenue' : ''}" aria-pressed="${sel === k}" ${tip ? `title="${tip}"` : 'title="Clic para filtrar la lista"'} style="--k:${m.colores[k]}"><i></i>${texto} <b>${nf.format(m[k])}</b></button>`;
         $('d-et-salud').innerHTML = `<div class="et-barra">${seg('mora', 'En mora')}${seg('riesgo', 'En riesgo')}${seg('aldia', 'Al día')}</div>
             <div class="et-leyenda">
-                <span title="Mora desde ${m.umbral} días"><i style="background:${m.colores.mora}"></i>En mora <b>${nf.format(m.mora)}</b></span>
-                <span><i style="background:${m.colores.riesgo}"></i>En riesgo <b>${nf.format(m.riesgo)}</b></span>
-                <span><i style="background:${m.colores.aldia}"></i>Al día <b>${nf.format(m.aldia)}</b></span>
+                ${item('mora', 'En mora', `Mora desde ${m.umbral} días · clic para filtrar`)}${item('riesgo', 'En riesgo')}${item('aldia', 'Al día')}
+                ${sel ? '<button type="button" data-nivel="" class="et-quitar" title="Quitar el filtro"><i class="fa-solid fa-xmark"></i> Quitar filtro</button>' : ''}
             </div>`;
     }
 
@@ -134,24 +213,43 @@ export function iniciarEtapas({ url, urlDocumentos, getPeriodo, esAdmin, onAbrir
         return (i.estado ? `<span class="et-chip neutro">${esc(i.estado)}</span>` : '') + c;
     }
 
+    const NIVEL = { mora: 'En mora', riesgo: 'En riesgo', aldia: 'Al día' };
+    const corta = (iso) => (iso ? new Date(`${iso}T00:00:00`).toLocaleDateString('es-CO', { day: 'numeric', month: 'short' }) : '');
+    const hoyIso = () => new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+
+    // Misma tarjeta del tablero de solicitudes: borde por mora, bloques Estado / Próx. contacto, caja de mora y pie.
     function pintarDocs(x, d) {
         const colores = d.colores;
-        $('d-et-docs').innerHTML = d.items.length ? d.items.map((i, k) => `
-            <button type="button" class="et-doc" data-modulo="${i.modulo}" data-doc="${i.doc}" style="--n:${colores[i.nivel]};--k:${Math.min(k, 12)}" title="Abrir seguimiento">
-                <span class="et-dias"><b>${nf.format(i.dias)}</b><small>días</small></span>
-                <span class="et-doc-b"><b>${esc(i.ref)} · ${esc(i.empresa)}</b>${i.titulo ? `<small>${esc(i.titulo)}</small>` : ''}<span class="et-chips">${chipsDoc(i)}${i.gestor && e.alcance === 'todos' ? `<span class="et-gestor">${esc(i.gestor)}</span>` : ''}</span></span>
-                ${i.valor ? `<span class="et-doc-v">${dineroCorto(i.valor)}</span>` : ''}
-            </button>`).join('') + (d.total > d.items.length ? `<p class="et-mas">Mostrando ${d.items.length} de ${nf.format(d.total)} · usa el buscador para acotar</p>` : '')
+        const hoy = hoyIso();
+        $('d-et-docs').innerHTML = d.items.length ? d.items.map((i, k) => {
+            const c = colores[i.nivel];
+            const vencido = i.proximo && i.proximo <= hoy;
+            const tag2 = i.modulo === 'solicitud'
+                ? `<span class="et-tg"><span>Próx. contacto</span><b class="${vencido ? 'crit' : ''}"><i style="background:${vencido ? '#dc2626' : 'var(--muted-foreground)'}"></i>${i.proximo ? (vencido ? `Contactar · ${corta(i.proximo)}` : corta(i.proximo)) : 'Sin programar'}</b></span>`
+                : `<span class="et-tg"><span>${i.valor ? 'Valor' : 'Responsable'}</span><b><i style="background:var(--muted-foreground)"></i>${i.valor ? dineroCorto(i.valor) : esc(i.gestor || '—')}</b></span>`;
+            return `<button type="button" class="et-doc" data-modulo="${i.modulo}" data-doc="${i.doc}" style="--n:${c};--k:${Math.min(k, 12)}" title="Abrir seguimiento">
+                <span class="et-h"><b>${esc(i.ref)}</b><span class="et-bd">${NIVEL[i.nivel]}</span></span>
+                <span class="et-cli">${esc(i.empresa)}</span>
+                ${i.titulo ? `<span class="et-ds">${esc(i.titulo)}</span>` : ''}
+                <span class="et-gr">
+                    <span class="et-tg"><span>Estado</span><b><i style="background:var(--primary)"></i>${esc(i.estado || '—')}</b></span>
+                    ${tag2}
+                </span>
+                <span class="et-mo"><span>MORA TOTAL <small>desde ${i.desde ? corta(i.desde) : 'ingreso'}</small></span><b>${nf.format(i.dias)} <small>días</small></b></span>
+                <span class="et-pie"><span class="et-gestor">${i.gestor ? `&#128100; ${esc(i.gestor)}` : ''}</span>${i.clasif.length ? `<span class="et-chips">${i.clasif.map((q) => `<span class="et-chip" style="--k:${q.color}" title="${esc(q.tipo)}">${esc(q.valor)}</span>`).join('')}</span>` : ''}${i.valor && i.modulo !== 'solicitud' ? `<span class="et-doc-v">${dineroCorto(i.valor)}</span>` : ''}</span>
+            </button>`;
+        }).join('') + (d.total > d.items.length ? `<p class="et-mas">Mostrando ${d.items.length} de ${nf.format(d.total)} · usa el buscador para acotar</p>` : '')
             : '<div class="ag-vacio"><i class="fa-solid fa-circle-check"></i><b>Sin documentos</b><span>No hay documentos activos en este periodo.</span></div>';
     }
 
     async function cargarDocs(x) {
-        const clave = `${x.clave}|${getPeriodo()}|${e.alcance}|${docs.q}`;
+        const nivel = e.nivel[x.clave] || '';
+        const clave = `${x.clave}|${getPeriodo()}|${e.alcance}|${docs.q}|${nivel}`;
         const n = ++docs.seq;
         if (docs.cache.has(clave)) { pintarDocs(x, docs.cache.get(clave)); return; }
         $('d-et-docs').innerHTML = Array(4).fill('<div class="et-doc-sk"></div>').join('');
         try {
-            const res = await fetch(`${urlDocumentos.replace('__E__', x.clave)}?${new URLSearchParams({ periodo: getPeriodo(), alcance: esAdmin ? e.alcance : 'mios', q: docs.q })}`, { headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' } });
+            const res = await fetch(`${urlDocumentos.replace('__E__', x.clave)}?${new URLSearchParams({ periodo: getPeriodo(), alcance: esAdmin ? e.alcance : 'mios', q: docs.q, nivel })}`, { headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' } });
             if (!res.ok) throw new Error(`Error ${res.status}`);
             const d = await res.json();
             docs.cache.set(clave, d);
@@ -160,6 +258,17 @@ export function iniciarEtapas({ url, urlDocumentos, getPeriodo, esAdmin, onAbrir
             if (n === docs.seq) $('d-et-docs').innerHTML = `<div class="ag-vacio"><i class="fa-solid fa-triangle-exclamation"></i><b>No se pudo cargar</b><span>${esc(err.message)}</span></div>`;
         }
     }
+
+    // Clic en la barra o en la leyenda de mora: filtra la lista por ese nivel (otro clic en el mismo lo quita).
+    $('d-et-salud').addEventListener('click', (ev) => {
+        const b = ev.target.closest('[data-nivel]');
+        if (!b || !e.datos) return;
+        const x = e.datos.etapas[e.idx];
+        const k = b.dataset.nivel;
+        e.nivel[x.clave] = k && e.nivel[x.clave] !== k ? k : '';
+        pintarSalud(x);
+        cargarDocs(x);
+    });
 
     // ---- KPIs del tablero comercial
     function pintarKpisTablero() {
