@@ -14,6 +14,8 @@ const DEFS = [
 ];
 
 export function iniciarLeyenda({ url, getPeriodo, getAlcance }) {
+    // Bloque suspendido en la vista (sin url): no se consulta ni se pinta nada.
+    if (!url) return { cargar() {}, etapas() {}, repintar() {} };
     const e = { datos: null, etapas: null, charts: {}, ctrl: null };
 
     const grafica = (id, cfg) => {

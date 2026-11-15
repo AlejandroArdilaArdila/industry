@@ -131,6 +131,44 @@ class MicrosoftController extends Controller
         }
     }
 
+    /** Elimina un evento del calendario de Outlook del usuario (solo si lo organiza él). */
+    public function eliminarEvento(Request $request): JsonResponse
+    {
+        $d = $request->validate(['id' => ['required', 'string', 'max:500']]);
+        $cuenta = $this->sync->cuenta((int) $this->usuario()->getKey());
+        abort_unless($cuenta, 404, 'No tienes Office 365 conectado.');
+
+        try {
+            $this->sync->eliminarEventoOutlook($cuenta, $d['id']);
+        } catch (\InvalidArgumentException $e) {
+            abort(403, $e->getMessage());
+        } catch (Throwable $e) {
+            report($e);
+            abort(502, 'No se pudo eliminar el evento en Outlook.');
+        }
+
+        return response()->json(['ok' => true, 'message' => 'Evento eliminado de tu Outlook']);
+    }
+
+    /** Rechaza un evento organizado por otra persona («No asistiré», con motivo opcional). */
+    public function rechazarEvento(Request $request): JsonResponse
+    {
+        $d = $request->validate(['id' => ['required', 'string', 'max:500'], 'motivo' => ['nullable', 'string', 'max:500']]);
+        $cuenta = $this->sync->cuenta((int) $this->usuario()->getKey());
+        abort_unless($cuenta, 404, 'No tienes Office 365 conectado.');
+
+        try {
+            $this->sync->rechazarEventoOutlook($cuenta, $d['id'], $d['motivo'] ?? null);
+        } catch (\InvalidArgumentException $e) {
+            abort(403, $e->getMessage());
+        } catch (Throwable $e) {
+            report($e);
+            abort(502, 'No se pudo rechazar el evento en Outlook.');
+        }
+
+        return response()->json(['ok' => true, 'message' => 'Evento rechazado: se avisó al organizador']);
+    }
+
     public function desconectar(): JsonResponse
     {
         $uid = (int) $this->usuario()->getKey();

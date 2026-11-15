@@ -134,6 +134,23 @@ class TareasController extends Controller
         return response()->json(['ok' => true, 'message' => 'Tarea eliminada']);
     }
 
+    /** «Rechazar»: el usuario sale de una tarea que creó otra persona. */
+    public function rechazar(int $tarea): JsonResponse
+    {
+        $uid = (int) $this->usuario()->getKey();
+        $d = $this->tareas->detalle($this->usuario(), $tarea);
+        abort_unless($d, 404, 'Tarea no encontrada.');
+        abort_unless($d['puedeSalir'], 403, 'Quien creó la tarea no puede rechazarla: puede eliminarla.');
+        $this->microsoft->eliminarTarea($tarea, $uid); // solo lo de su propio Outlook / To Do
+        try {
+            $this->tareas->salir($this->usuario(), $tarea);
+        } catch (InvalidArgumentException $e) {
+            abort(403, $e->getMessage());
+        }
+
+        return response()->json(['ok' => true, 'message' => 'Tarea rechazada: ya no eres integrante']);
+    }
+
     public function posponer(Request $request, int $tarea): JsonResponse
     {
         $d = $request->validate(['fecha' => ['required', 'date_format:Y-m-d', 'after_or_equal:'.Carbon::now(TareasService::TZ)->toDateString()], 'hora' => ['nullable', 'date_format:H:i']]);

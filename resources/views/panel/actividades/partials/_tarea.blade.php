@@ -7,7 +7,7 @@
 @endphp
 <div data-ficha data-puede-editar="1" data-tarea-detalle="{{ $t['id'] }}" class="flex h-full min-h-0 flex-col"
      data-estado-url="{{ route('panel.tareas.estado', ['tarea' => $t['id']]) }}" data-posponer-url="{{ route('panel.tareas.posponer', ['tarea' => $t['id']]) }}"
-     data-eliminar-url="{{ route('panel.tareas.destroy', ['tarea' => $t['id']]) }}" data-programada="{{ $t['programada'] }}">
+     data-rechazar-url="{{ route('panel.tareas.rechazar', ['tarea' => $t['id']]) }}" data-eliminar-url="{{ route('panel.tareas.destroy', ['tarea' => $t['id']]) }}" data-programada="{{ $t['programada'] }}">
     <script type="application/json" data-ficha-catalogos>{}</script>
     <header class="relative flex-shrink-0 overflow-hidden border-b border-border px-5 pt-5 pb-4 sm:px-7" style="--c: {{ $c }}; background-image: linear-gradient(135deg, color-mix(in oklab, {{ $c }} 16%, transparent), transparent 70%)">
         <button type="button" data-ficha-close title="Cerrar (Esc)" class="absolute top-4 right-4 flex h-9 w-9 items-center justify-center rounded-full text-muted-foreground transition hover:bg-muted hover:text-foreground"><i class="fa-solid fa-xmark text-lg"></i></button>
@@ -74,11 +74,13 @@
                         @else
                             <button type="button" data-tarea-reabrir class="inline-flex h-9 items-center gap-2 rounded-lg border border-border px-4 text-sm font-medium transition hover:bg-muted"><i class="fa-solid fa-rotate-left"></i> Reabrir</button>
                         @endif
+                        @if ($t['puedeSalir'])<button type="button" data-tarea-rechazar class="ml-auto inline-flex h-9 items-center gap-2 rounded-lg px-3 text-sm font-medium text-[#9333ea] transition hover:bg-[#a855f7]/10" title="Dejar de ser integrante"><i class="fa-solid fa-ban"></i> Rechazar</button>@endif
                         @if ($t['puedeEliminar'])<button type="button" data-tarea-eliminar class="ml-auto inline-flex h-9 items-center gap-2 rounded-lg px-3 text-sm font-medium text-destructive transition hover:bg-destructive/10" title="Eliminar la tarea"><i class="fa-solid fa-trash-can"></i> Eliminar</button>@endif
-                        <button type="button" data-ficha-close class="{{ $t['puedeEliminar'] ? '' : 'ml-auto ' }}inline-flex h-9 items-center rounded-lg px-3 text-sm font-medium text-muted-foreground transition hover:bg-muted">Cerrar</button>
+                        <button type="button" data-ficha-close class="{{ $t['puedeEliminar'] || $t['puedeSalir'] ? '' : 'ml-auto ' }}inline-flex h-9 items-center rounded-lg px-3 text-sm font-medium text-muted-foreground transition hover:bg-muted">Cerrar</button>
                     </div>
                 @else
                     <div class="flex items-center gap-3 text-xs text-muted-foreground"><i class="fa-solid fa-lock"></i> Solo {{ $t['creador'] ?: 'quien la creó' }} puede cambiar el estado de esta tarea.
+                        @if ($t['puedeSalir'])<button type="button" data-tarea-rechazar class="ml-auto inline-flex h-9 items-center gap-2 rounded-lg px-3 text-sm font-medium text-[#9333ea] transition hover:bg-[#a855f7]/10"><i class="fa-solid fa-ban"></i> Rechazar</button>@endif
                         <button type="button" data-ficha-close class="ml-auto inline-flex h-9 items-center rounded-lg px-3 text-sm font-medium transition hover:bg-muted">Cerrar</button></div>
                 @endif
             </div>

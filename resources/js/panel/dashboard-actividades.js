@@ -1,6 +1,7 @@
 // Programador de actividades: lista los recordatorios y seguimientos del usuario y abre el panel lateral
 // (media pantalla) para programar otros o cerrar los pendientes.
 import { ActividadFichaModal } from './actividades-ficha.js';
+import Swal from 'sweetalert2';
 import { toast } from './ficha-modal.js';
 import { esc, fecha, hora, isoLocal, COLORES_CARD } from './dashboard-util.js';
 
@@ -69,10 +70,15 @@ export function iniciarActividades({ url, panelUrl, csrf, ms: msCfg, tareas: tar
 
     function itemExt(i) {
         const h = i.todoDia ? '<i class="fa-solid fa-sun"></i>' : hora(i.cuando);
-        return `<button type="button" class="ag-item ext ${i.grupo}" data-ext="${esc(i.url || '')}" style="--c:#0078d4">
+        const ajeno = i.propio === false; // lo organiza otra persona: solo lectura
+        const quien = i.organizador ? ` · ${ajeno ? 'Organiza' : ''} ${esc(i.organizador)}`.replace('·  ', '· ') : '';
+        const borrar = !ajeno
+            ? `<span class="ag-del" role="button" data-evento-eliminar="${esc(i.id)}" data-titulo="${esc(i.titulo)}" title="Eliminar de mi Outlook"><i class="fa-solid fa-trash-can"></i></span>`
+            : `<span class="ag-del rechazar" role="button" data-evento-rechazar="${esc(i.id)}" data-titulo="${esc(i.titulo)}" title="Rechazar (No asistiré)"><i class="fa-solid fa-ban"></i></span>`;
+        return `<button type="button" class="ag-item ext ${i.grupo} ${ajeno ? 'ajeno' : ''}" data-ext="${esc(i.url || '')}" style="--c:${ajeno ? '#a855f7' : '#0078d4'}">
             <span class="ag-when"><b>${h}</b><small>${i.todoDia ? 'Todo el día' : fecha(i.cuando)}</small></span>
-            <span class="ag-body"><b>${esc(i.titulo)}</b><small>Calendario de Outlook${i.organizador ? ` · ${esc(i.organizador)}` : ''}${i.teams ? ` · <span class="ag-teams" data-teams="${esc(i.teams)}" title="Unirse a la reunión de Teams"><i class="fa-solid fa-video"></i> Teams</span>` : ''}</small></span>
-            <span class="flex items-center gap-2"><span class="ag-tag" title="Outlook"><i class="fa-brands fa-microsoft"></i></span></span></button>`;
+            <span class="ag-body"><b>${esc(i.titulo)}</b><small>Calendario de Outlook${quien}${ajeno ? ' <span class="ag-de" title="Lo organiza otra persona: no puedes editarlo desde aquí"><i class="fa-solid fa-lock"></i> Solo lectura</span>' : ''}${i.teams ? ` · <span class="ag-teams" data-teams="${esc(i.teams)}" title="Unirse a la reunión de Teams"><i class="fa-solid fa-video"></i> Teams</span>` : ''}</small></span>
+            <span class="flex items-center gap-2">${borrar}<span class="ag-tag" title="Outlook"><i class="fa-brands fa-microsoft"></i></span></span></button>`;
     }
 
     /** Rango de fechas visible (semana o cuadrícula del mes) para pedir los eventos de Outlook. */
@@ -114,10 +120,16 @@ export function iniciarActividades({ url, panelUrl, csrf, ms: msCfg, tareas: tar
             i.integrantes > 1 ? `<i class="fa-solid fa-user-group" title="${i.integrantes} integrantes"></i>` : '',
         ].filter(Boolean).join('') : '';
         const dato = tarea ? `data-tarea="${i.tarea}"` : `data-modulo="${i.modulo}" data-id="${i.fkRecord}"`;
-        return `<button type="button" class="ag-item ${i.grupo} ${i.horaVencida ? 'vencida' : ''}" ${dato} style="--c:${color(i.card)}">
+        // Lo creado por otra persona se pinta distinto (violeta con rayas) y, si no se puede cambiar, con candado.
+        const ajena = tarea && !i.propia;
+        const de = ajena ? ` <span class="ag-de" title="${i.puedeCambiar ? 'La creó otra persona; puedes cambiar su estado' : 'La creó otra persona: no puedes editarla'}"><i class="fa-solid ${i.puedeCambiar ? 'fa-user' : 'fa-lock'}"></i> ${esc((i.creador || 'Otro usuario').split(' ')[0])}</span>` : '';
+        const borrar = tarea ? (i.puedeEliminar
+            ? `<span class="ag-del" role="button" data-tarea-eliminar="${i.tarea}" data-titulo="${esc(i.titulo)}" title="Eliminar tarea"><i class="fa-solid fa-trash-can"></i></span>`
+            : (i.puedeSalir ? `<span class="ag-del rechazar" role="button" data-tarea-rechazar="${i.tarea}" data-titulo="${esc(i.titulo)}" title="Rechazar: dejar de ser integrante"><i class="fa-solid fa-ban"></i></span>` : '')) : '';
+        return `<button type="button" class="ag-item ${i.grupo} ${i.horaVencida ? 'vencida' : ''} ${ajena ? 'ajeno' : ''}" ${dato} style="--c:${ajena ? '#a855f7' : color(i.card)}">
             <span class="ag-when"><b>${i.grupo === 'realizado' ? '<i class="fa-solid fa-check"></i>' : hora(i.cuando)}</b><small>${fecha(i.cuando)}</small></span>
-            <span class="ag-body"><b>${esc(i.titulo)}</b><small>${esc(sub)}${marcas ? ` <span class="ag-marcas">${marcas}</span>` : ''}${i.teams ? ` · <span class="ag-teams" data-teams="${esc(i.teams)}" title="Unirse a la reunión de Teams"><i class="fa-solid fa-video"></i> Teams</span>` : ''}</small>${extra}</span>
-            <span class="flex items-center gap-2">${i.ms ? '<span class="ag-msic" title="Sincronizado con Office 365"><i class="fa-brands fa-microsoft"></i></span>' : ''}${tarea && i.grupo !== 'realizado' ? `<span class="ag-check" role="button" data-tarea-hecho="${i.tarea}" title="Completar"><i class="fa-solid fa-check"></i></span>` : ''}<span class="ag-tag" title="${esc(i.moduloNombre)}"><i class="fa-solid ${i.icono}"></i></span></span></button>`;
+            <span class="ag-body"><b>${esc(i.titulo)}</b><small>${esc(sub)}${de}${marcas ? ` <span class="ag-marcas">${marcas}</span>` : ''}${i.teams ? ` · <span class="ag-teams" data-teams="${esc(i.teams)}" title="Unirse a la reunión de Teams"><i class="fa-solid fa-video"></i> Teams</span>` : ''}</small>${extra}</span>
+            <span class="flex items-center gap-2">${i.ms ? '<span class="ag-msic" title="Sincronizado con Office 365"><i class="fa-brands fa-microsoft"></i></span>' : ''}${tarea && i.grupo !== 'realizado' && i.puedeCambiar ? `<span class="ag-check" role="button" data-tarea-hecho="${i.tarea}" title="Completar"><i class="fa-solid fa-check"></i></span>` : ''}${borrar}<span class="ag-tag" title="${esc(i.moduloNombre)}"><i class="fa-solid ${i.icono}"></i></span></span></button>`;
     }
 
     function lista() {
@@ -180,6 +192,50 @@ export function iniciarActividades({ url, panelUrl, csrf, ms: msCfg, tareas: tar
     const mj = (u, method = 'GET', body) => fetch(u, { method, headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest', 'X-CSRF-TOKEN': csrf, ...(body ? { 'Content-Type': 'application/json' } : {}) }, body: body ? JSON.stringify(body) : undefined }).then(async (r) => { const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(j.message || `Error ${r.status}`); return j; });
     const ms = { est: null, abierto: false };
 
+    /** Eliminar desde la lista: tarea del panel o evento de Outlook, con confirmación y la tarjeta bloqueada mientras se borra. */
+    async function eliminar(titulo, esTarea, id) {
+        const { isConfirmed } = await Swal.fire({
+            title: esTarea ? '¿Eliminar esta tarea?' : '¿Eliminar este evento de tu Outlook?', icon: 'warning', showCancelButton: true, reverseButtons: true, confirmButtonColor: '#dc2626',
+            confirmButtonText: 'Sí, eliminar', cancelButtonText: 'Cancelar', html: `<b>${esc(titulo)}</b><br><small>${esTarea ? 'Se quitará para todos los integrantes y de su Outlook y To Do.' : 'Se borrará de tu calendario de Outlook.'} No se puede deshacer.</small>`,
+        });
+        if (!isConfirmed) return;
+        const card = $('d-act-card');
+        card.classList.add('cargando', 'ag-bloqueada');
+        try {
+            const r = esTarea ? await mj(tareasCfg.eliminar.replace('__ID__', id), 'DELETE') : await mj(msCfg.eventoEliminar, 'DELETE', { id });
+            toast.fire({ icon: 'success', title: r.message });
+            s.cacheExt.clear();
+            await cargar();
+        } catch (e) {
+            Swal.fire({ icon: 'error', title: 'No se pudo eliminar', text: e.message });
+        } finally {
+            card.classList.remove('cargando', 'ag-bloqueada');
+        }
+    }
+
+    /** Rechazar desde la lista: salir de una tarea ajena o responder «No asistiré» a un evento de Outlook de otra persona. */
+    async function rechazar(titulo, esTarea, id) {
+        const r = await Swal.fire({
+            title: esTarea ? '¿Rechazar esta tarea?' : '¿Rechazar este evento?', icon: 'question', showCancelButton: true, reverseButtons: true, confirmButtonColor: '#9333ea',
+            confirmButtonText: 'Sí, rechazar', cancelButtonText: 'Cancelar',
+            html: `<b>${esc(titulo)}</b><br><small>${esTarea ? 'Dejarás de ser integrante; quien la creó y los demás la conservan.' : 'Se responderá «No asistiré» al organizador y se quitará de tu calendario.'}</small>`,
+            input: esTarea ? undefined : 'text', inputPlaceholder: 'Motivo (opcional)', inputAttributes: { maxlength: 300 },
+        });
+        if (!r.isConfirmed) return;
+        const card = $('d-act-card');
+        card.classList.add('cargando', 'ag-bloqueada');
+        try {
+            const j = esTarea ? await mj(tareasCfg.rechazar.replace('__ID__', id), 'POST') : await mj(msCfg.eventoRechazar, 'POST', { id, motivo: r.value || '' });
+            toast.fire({ icon: 'success', title: j.message });
+            s.cacheExt.clear();
+            await cargar();
+        } catch (e) {
+            Swal.fire({ icon: 'error', title: 'No se pudo rechazar', text: e.message });
+        } finally {
+            card.classList.remove('cargando', 'ag-bloqueada');
+        }
+    }
+
     function pintarMs() {
         const c = $('d-act-ms'), e = ms.est;
         if (!msCfg || !e || !e.configurado) { c.classList.add('hidden'); return; }
@@ -234,6 +290,22 @@ export function iniciarActividades({ url, panelUrl, csrf, ms: msCfg, tareas: tar
     cargarMs();
 
     $('d-act-card').addEventListener('click', (ev) => {
+        const delT = ev.target.closest('[data-tarea-eliminar]');
+        const delE = ev.target.closest('[data-evento-eliminar]');
+        const rchT = ev.target.closest('[data-tarea-rechazar]');
+        const rchE = ev.target.closest('[data-evento-rechazar]');
+        if (delT || delE) {
+            ev.stopPropagation();
+            const el = delT || delE;
+            eliminar(el.dataset.titulo, !!delT, delT ? delT.dataset.tareaEliminar : delE.dataset.eventoEliminar);
+            return null;
+        }
+        if (rchT || rchE) {
+            ev.stopPropagation();
+            const el = rchT || rchE;
+            rechazar(el.dataset.titulo, !!rchT, rchT ? rchT.dataset.tareaRechazar : rchE.dataset.eventoRechazar);
+            return null;
+        }
         const tm = ev.target.closest('[data-teams]');
         if (tm) { ev.stopPropagation(); window.open(tm.dataset.teams, '_blank', 'noopener'); return null; }
         const ex = ev.target.closest('[data-ext]');
@@ -260,7 +332,7 @@ export function iniciarActividades({ url, panelUrl, csrf, ms: msCfg, tareas: tar
             s.dia = null; s.externos = []; modo(); semana(s.datos.items); lista(); return cargarExternos();
         }
         const d = ev.target.closest('[data-dia]');
-        if (d) { s.dia = s.dia === d.dataset.dia ? null : d.dataset.dia; semana(s.datos.items); return lista(); }
+        if (d) { s.dia = s.dia === d.dataset.dia ? null : d.dataset.dia; if (s.dia) s.filtro = null; resumen(s.datos.resumen); semana(s.datos.items); return lista(); }
         const ck = ev.target.closest('[data-tarea-hecho]');
         if (ck) {
             ev.stopPropagation();

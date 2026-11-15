@@ -202,6 +202,7 @@ class TareasService
     {
         return "SELECT t.rowid id, t.title, t.description, t.date_schedule, t.date_close, t.fk_c_solubitacora_prioridad pr, t.type_rq, t.ref_rq, t.recurrencia rec,
                 t.state_change, t.fk_user_creat, t.fk_c_solubitacora_estado estado,
+                (SELECT TRIM(CONCAT(COALESCE(u.firstname,''),' ',COALESCE(u.lastname,''))) FROM {$this->p}user u WHERE u.rowid = t.fk_user_creat) creador_nombre,
                 (SELECT COUNT(*) FROM {$this->p}solubitacora_seguimiento x WHERE x.fk_solubitacora_tareas = t.rowid) n
             FROM {$this->p}solubitacora_tareas t";
     }
@@ -246,18 +247,19 @@ class TareasService
         $orden = $pend ? 't.date_schedule ASC' : 't.date_close DESC';
         $filas = DB::select($this->filaSql().' WHERE '.sprintf(self::ES_INTEGRANTE, $this->p)." AND {$filtro} ORDER BY {$orden} LIMIT {$limite}", [$usuario->getKey()]);
 
-        return $this->aItems($filas, $pend);
+        return $this->aItems($filas, $pend, $usuario);
     }
 
-    private function aItems(array $filas, bool $pend): array
+    private function aItems(array $filas, bool $pend, object $usuario): array
     {
+        $uid = (int) $usuario->getKey();
         $ahora = Carbon::now(self::TZ)->startOfMinute();
         $hoy = $ahora->copy()->startOfDay();
         $el = $this->elementos(array_map(fn ($f) => [(string) $f->type_rq, (int) $f->ref_rq], $filas));
         $prio = collect($this->catalogos()['prioridades'])->keyBy('id');
         $prioPorId = collect(DB::select("SELECT rowid, label, color, fontColor FROM {$this->p}c_solubitacora_prioridad"))->keyBy('rowid');
 
-        return array_map(function ($f) use ($pend, $ahora, $hoy, $el, $prioPorId) {
+        return array_map(function ($f) use ($pend, $ahora, $hoy, $el, $prioPorId, $uid, $usuario) {
             $prog = Carbon::parse($f->date_schedule, self::TZ);
             $cuando = $pend ? self::proxima($prog, (int) $f->rec, $hoy) : Carbon::parse($f->date_close ?: $f->date_schedule, self::TZ);
             $e = $el["{$f->type_rq}:{$f->ref_rq}"] ?? null;
@@ -274,6 +276,11 @@ class TareasService
                 'prioridad' => $p ? ['label' => $p->label, 'color' => $p->color] : null,
                 'recurrencia' => (int) $f->rec > 1 ? self::RECURRENCIAS[(int) $f->rec] : null,
                 'integrantes' => (int) $f->n,
+                // Autoría: lo creado por otra persona se muestra distinto y puede ser de solo lectura.
+                'propia' => (int) $f->fk_user_creat === $uid, 'creadorId' => (int) $f->fk_user_creat, 'creador' => trim((string) $f->creador_nombre),
+                'puedeCambiar' => $usuario->isAdmin() || (int) $f->fk_user_creat === $uid || (int) $f->state_change === 1,
+                'puedeEliminar' => $usuario->isAdmin() || (int) $f->fk_user_creat === $uid,
+                'puedeSalir' => (int) $f->fk_user_creat !== $uid,
             ];
         }, $filas);
     }
@@ -301,7 +308,7 @@ class TareasService
         if (! $esIntegrante && ! $usuario->isAdmin() && (int) $f->fk_user_creat !== $uid) {
             return null;
         }
-        $item = $this->aItems([$f], $f->date_close === null && (int) $f->estado !== self::CERRADA)[0];
+        $item = $this->aItems([$f], $f->date_close === null && (int) $f->estado !== self::CERRADA, $usuario)[0];
         $creador = DB::selectOne("SELECT TRIM(CONCAT(COALESCE(firstname,''),' ',COALESCE(lastname,''))) n FROM {$this->p}user WHERE rowid = ?", [$f->fk_user_creat]);
         $el = $this->elementos([[(string) $f->type_rq, (int) $f->ref_rq]])["{$f->type_rq}:{$f->ref_rq}"] ?? null;
         $vinculo = DB::table('panel_ms_vinculos')->where('tarea_id', $id)->where('user_id', $uid)->first();
@@ -353,6 +360,23 @@ class TareasService
             DB::table('solubitacora_seguimiento')->where('fk_solubitacora_tareas', $id)->delete();
             DB::table('panel_ms_vinculos')->where('tarea_id', $id)->delete();
             DB::table('solubitacora_tareas')->where('rowid', $id)->delete();
+        });
+    }
+
+    /** «Rechazar» una tarea creada por otra persona: el usuario deja de ser integrante (la tarea sigue para los demás). */
+    public function salir(object $usuario, int $id): void
+    {
+        $d = $this->detalle($usuario, $id);
+        if (! $d) {
+            throw new InvalidArgumentException('Tarea no encontrada.');
+        }
+        if (! $d['puedeSalir']) {
+            throw new InvalidArgumentException('Quien creó la tarea no puede rechazarla: puede eliminarla.');
+        }
+        $uid = (int) $usuario->getKey();
+        DB::transaction(function () use ($id, $uid) {
+            DB::table('solubitacora_seguimiento')->where('fk_solubitacora_tareas', $id)->where('fk_user', $uid)->delete();
+            DB::table('panel_ms_vinculos')->where('tarea_id', $id)->where('user_id', $uid)->delete();
         });
     }
 

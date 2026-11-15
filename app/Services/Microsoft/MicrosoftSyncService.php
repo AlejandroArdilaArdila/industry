@@ -211,9 +211,9 @@ class MicrosoftSyncService
     }
 
     /** Tarea eliminada: se borra el evento de Outlook y la tarea de To Do de cada integrante. Llamar ANTES de borrar los vínculos. */
-    public function eliminarTarea(int $tareaId): void
+    public function eliminarTarea(int $tareaId, ?int $soloUsuario = null): void
     {
-        foreach (DB::table('panel_ms_vinculos')->where('tarea_id', $tareaId)->get() as $v) {
+        foreach (DB::table('panel_ms_vinculos')->where('tarea_id', $tareaId)->when($soloUsuario, fn ($q) => $q->where('user_id', $soloUsuario))->get() as $v) {
             $cuenta = $this->cuenta((int) $v->user_id);
             if (! $cuenta) {
                 continue;
@@ -367,7 +367,7 @@ class MicrosoftSyncService
         $r = $this->graph->revisar($this->graph->http($cuenta)->get('/me/calendarView', [
             'startDateTime' => $desde->copy()->startOfDay()->format('Y-m-d\TH:i:sP'),
             'endDateTime' => $hasta->copy()->endOfDay()->format('Y-m-d\TH:i:sP'),
-            '$select' => 'id,subject,start,end,isAllDay,isCancelled,webLink,onlineMeeting,showAs,organizer',
+            '$select' => 'id,subject,start,end,isAllDay,isCancelled,webLink,onlineMeeting,showAs,organizer,isOrganizer',
             '$orderby' => 'start/dateTime',
             '$top' => 250,
         ]));
@@ -383,7 +383,36 @@ class MicrosoftSyncService
                 'url' => $e['webLink'] ?? null,
                 'teams' => $e['onlineMeeting']['joinUrl'] ?? null,
                 'organizador' => $e['organizer']['emailAddress']['name'] ?? null,
+                'propio' => (bool) ($e['isOrganizer'] ?? true),
             ])->values()->all();
+    }
+
+    /** «Rechazar» un evento que organiza otra persona: responde «No asistiré» (avisa al organizador) y lo quita del calendario. */
+    public function rechazarEventoOutlook(object $cuenta, string $id, ?string $motivo = null): void
+    {
+        if (DB::table('panel_ms_vinculos')->where('user_id', $cuenta->user_id)->where('ms_evento_id', $id)->exists()) {
+            throw new \InvalidArgumentException('Este evento pertenece a una tarea del panel: recházala desde la tarea.');
+        }
+        $http = $this->graph->http($cuenta);
+        $e = $this->graph->revisar($http->get('/me/events/'.rawurlencode($id).'?$select=isOrganizer'));
+        if ($e->json('isOrganizer') === true) {
+            throw new \InvalidArgumentException('Tú organizas este evento: puedes eliminarlo, no rechazarlo.');
+        }
+        $this->graph->revisar($http->post('/me/events/'.rawurlencode($id).'/decline', ['sendResponse' => true, 'comment' => (string) $motivo]));
+    }
+
+    /** Borra de Outlook un evento que el usuario organiza (los nacidos en el panel se eliminan desde su tarea). */
+    public function eliminarEventoOutlook(object $cuenta, string $id): void
+    {
+        if (DB::table('panel_ms_vinculos')->where('user_id', $cuenta->user_id)->where('ms_evento_id', $id)->exists()) {
+            throw new \InvalidArgumentException('Este evento pertenece a una tarea del panel: elimínala desde la tarea.');
+        }
+        $http = $this->graph->http($cuenta);
+        $e = $this->graph->revisar($http->get('/me/events/'.rawurlencode($id).'?$select=isOrganizer'));
+        if ($e->status() !== 404 && $e->json('isOrganizer') === false) {
+            throw new \InvalidArgumentException('Solo quien organiza el evento puede eliminarlo.');
+        }
+        $this->graph->revisar($http->delete('/me/events/'.rawurlencode($id)));
     }
 
     // ------------------------------------------------------------------ Microsoft -> panel

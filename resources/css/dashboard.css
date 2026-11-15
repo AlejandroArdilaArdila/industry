@@ -545,3 +545,18 @@ button.ag-chip { border: 1.5px solid transparent; cursor: pointer; transition: b
 button.ag-chip:hover { transform: translateY(-1px); opacity: 1; background: color-mix(in oklab, var(--c) 22%, transparent); }
 button.ag-chip.on { border-color: var(--c); background: color-mix(in oklab, var(--c) 24%, transparent); box-shadow: 0 6px 14px -8px var(--c); opacity: 1; }
 .ag-chip.gris { --c: var(--muted-foreground); }
+
+/* Lo creado por otra persona (solo lectura / asignado): violeta con rayas, bien distinto de lo propio */
+.ag-item.ajeno { border-color: color-mix(in oklab, #a855f7 55%, var(--border)); background: repeating-linear-gradient(135deg, color-mix(in oklab, #a855f7 10%, var(--background)) 0 9px, var(--background) 9px 18px); }
+.ag-item.ajeno::before { width: 6px; }
+.ag-de { display: inline-flex; align-items: center; gap: 4px; margin-left: 4px; padding: 0 8px; border-radius: 999px; background: color-mix(in oklab, #a855f7 18%, transparent); color: #9333ea; font-size: 10.5px; font-weight: 700; }
+:root[data-theme='dark'] .ag-de { color: #c084fc; }
+.ag-del { display: grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; font-size: 11px; color: var(--muted-foreground); opacity: 0.6; transition: opacity 0.2s, background-color 0.2s, color 0.2s, transform 0.2s; }
+.ag-item:hover .ag-del, .ag-del:focus-visible { opacity: 1; }
+@media (hover: none) { .ag-del { opacity: 0.7; } }
+.ag-del:hover { background: #dc2626; color: #fff; transform: scale(1.12); }
+.ag-card { position: relative; }
+.ag-card.ag-bloqueada { pointer-events: none; }
+.ag-card.ag-bloqueada::before { content: ''; position: absolute; inset: 0; z-index: 40; background: color-mix(in oklab, var(--card) 70%, transparent); backdrop-filter: blur(2px); cursor: wait; }
+.ag-card.ag-bloqueada::after { content: ''; position: absolute; top: 50%; left: 50%; z-index: 41; width: 38px; height: 38px; margin: -19px 0 0 -19px; border: 4px solid color-mix(in oklab, var(--primary) 22%, transparent); border-top-color: var(--primary); border-radius: 50%; animation: dash-gira 0.75s linear infinite; }
+.ag-del.rechazar:hover { background: #9333ea; }

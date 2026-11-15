@@ -310,6 +310,21 @@ export function iniciarTareaDetalle(modal) {
         }, 'Eliminando la tarea…');
         if (ok) modal.cerrar(true);
     });
+    root.querySelector('[data-tarea-rechazar]')?.addEventListener('click', async () => {
+        const { isConfirmed } = await Swal.fire({
+            title: '¿Rechazar esta tarea?', icon: 'question', showCancelButton: true, reverseButtons: true, confirmButtonColor: '#9333ea',
+            confirmButtonText: 'Sí, rechazar', cancelButtonText: 'Cancelar',
+            text: 'Dejarás de ser integrante. Quien la creó y los demás la conservan, y se quitará de tu Outlook y To Do.',
+        });
+        if (!isConfirmed) return;
+        const ok = await accion(async () => {
+            const res = await fetch(root.dataset.rechazarUrl, { method: 'POST', headers: JSON_HEADERS(csrf) });
+            const json = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error(json.message || `HTTP ${res.status}`);
+            return json;
+        }, 'Rechazando la tarea…');
+        if (ok) modal.cerrar(true);
+    });
     root.querySelector('[data-abrir-doc]')?.addEventListener('click', (e) => { const [m, id] = e.currentTarget.dataset.abrirDoc.split(':'); modal.abrirDocumento(m, id); });
     root.querySelector('[data-tarea-hecho]')?.addEventListener('click', async () => { if (await accion(() => put(root.dataset.estadoUrl, { cerrada: true }), 'Completando la tarea…')) modal.cerrar(true); });
     root.querySelector('[data-tarea-reabrir]')?.addEventListener('click', async () => { if (await accion(() => put(root.dataset.estadoUrl, { cerrada: false }), 'Reabriendo la tarea…')) modal.abrirTarea(root.dataset.tareaDetalle); });

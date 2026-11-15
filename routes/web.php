@@ -68,6 +68,8 @@ Route::prefix('panel')->name('panel.')->middleware('auth:web')->group(function (
     Route::prefix('microsoft')->name('microsoft.')->group(function () {
         Route::get('/estado', [MicrosoftController::class, 'estado'])->name('estado');
         Route::get('/eventos', [MicrosoftController::class, 'eventos'])->name('eventos');
+        Route::delete('/evento', [MicrosoftController::class, 'eliminarEvento'])->name('evento.eliminar');
+        Route::post('/evento/rechazar', [MicrosoftController::class, 'rechazarEvento'])->name('evento.rechazar');
         Route::get('/conectar', [MicrosoftController::class, 'conectar'])->name('conectar');
         Route::put('/preferencias', [MicrosoftController::class, 'preferencias'])->name('preferencias');
         Route::post('/sincronizar', [MicrosoftController::class, 'sincronizar'])->name('sincronizar');
@@ -81,6 +83,7 @@ Route::prefix('panel')->name('panel.')->middleware('auth:web')->group(function (
         Route::post('/', [TareasController::class, 'store'])->name('store');
         Route::get('/{tarea}', [TareasController::class, 'show'])->whereNumber('tarea')->name('show');
         Route::delete('/{tarea}', [TareasController::class, 'destroy'])->whereNumber('tarea')->name('destroy');
+        Route::post('/{tarea}/rechazar', [TareasController::class, 'rechazar'])->whereNumber('tarea')->name('rechazar');
         Route::put('/{tarea}/estado', [TareasController::class, 'estado'])->whereNumber('tarea')->name('estado');
         Route::put('/{tarea}/posponer', [TareasController::class, 'posponer'])->whereNumber('tarea')->name('posponer');
     });

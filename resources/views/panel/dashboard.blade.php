@@ -34,7 +34,13 @@
         <div id="d-insights" class="dash-insights" @if ($soloComercial) style="display:none" @endif></div>
 
         {{-- KPIs --}}
-        <div id="d-kpis" class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6" @if ($soloComercial) style="display:none" @endif></div>
+        {{-- Bloques SUSPENDIDOS: siguen en el DOM (dashboard.js los pinta por su id) pero ocultos. Para reactivar uno, cambia su variable a true. --}}
+        @php
+            $mostrarKpis = false;            // barra de KPIs generales
+            $mostrarLeyenda = false;         // «Métricas de la leyenda» (y no se consulta al servidor)
+            $mostrarCalorProductos = false;  // «Calendario de ventas» + «Productos más vendidos»
+        @endphp
+        <div id="d-kpis" class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6" @if ($soloComercial || ! $mostrarKpis) style="display:none" @endif></div>
 
         {{-- Línea de proceso (solo negociadores): total y fecha más antigua por etapa, desde INFORMESSOLU_ANIO_DESDE --}}
         @if ($soloComercial)
@@ -114,7 +120,7 @@
         </div>
 
         {{-- Métricas de la leyenda del tablero --}}
-        <div class="mt-4">
+        <div class="mt-4" @if (! $mostrarLeyenda) style="display:none" @endif>
             <div class="mb-2 flex flex-wrap items-baseline gap-2"><h2 class="text-sm font-bold"><i class="fa-solid fa-chart-pie text-primary"></i> Métricas de la leyenda</h2><small class="text-xs text-muted-foreground" id="d-ley-nota"></small></div>
             <div id="d-leyenda" class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3"></div>
         </div>
@@ -132,7 +138,7 @@
         </div>
 
         {{-- Calendario de calor + productos --}}
-        <div class="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-3">
+        <div class="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-3" @if (! $mostrarCalorProductos) style="display:none" @endif>
             <section class="dash-card xl:col-span-2" style="--i:10">
                 <header class="dash-h"><h2><i class="fa-solid fa-fire text-orange-500"></i> Calendario de ventas <small>últimas 26 semanas</small></h2></header>
                 <div class="overflow-x-auto pb-1"><div id="d-heat" class="dash-heat"></div></div>
@@ -151,7 +157,7 @@
     'url' => route('panel.dashboard.data'),
     'urlEtapas' => route('panel.dashboard.etapas'),
     'urlDocumentos' => route('panel.dashboard.etapa.documentos', ['etapa' => '__E__']),
-    'urlLeyenda' => route('panel.dashboard.leyenda'),
+    'urlLeyenda' => $mostrarLeyenda ? route('panel.dashboard.leyenda') : null,
     'urlProceso' => route('panel.dashboard.proceso'),
     'urlProcesoDocs' => route('panel.dashboard.proceso.documentos', ['etapa' => '__E__']),
     'urlColores' => $user->isAdmin() ? route('panel.dashboard.colores') : null,
@@ -160,11 +166,15 @@
     'urlTareaForm' => route('panel.tareas.formulario'),
     'urlTareaShow' => route('panel.tareas.show', ['tarea' => '__ID__']),
     'urlTareaEstado' => route('panel.tareas.estado', ['tarea' => '__ID__']),
+    'urlTareaEliminar' => route('panel.tareas.destroy', ['tarea' => '__ID__']),
     'urlMicrosoft' => route('panel.microsoft.estado'),
     'urlMicrosoftConectar' => route('panel.microsoft.conectar'),
     'urlMicrosoftPrefs' => route('panel.microsoft.preferencias'),
     'urlMicrosoftSync' => route('panel.microsoft.sincronizar'),
     'urlMicrosoftEventos' => route('panel.microsoft.eventos'),
+    'urlMicrosoftEventoEliminar' => route('panel.microsoft.evento.eliminar'),
+    'urlMicrosoftEventoRechazar' => route('panel.microsoft.evento.rechazar'),
+    'urlTareaRechazar' => route('panel.tareas.rechazar', ['tarea' => '__ID__']),
     'urlMicrosoftBase' => route('panel.microsoft.desconectar'),
     'csrf' => csrf_token(),
     'esAdmin' => (bool) $user->isAdmin(),
