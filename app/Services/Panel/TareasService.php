@@ -117,11 +117,11 @@ class TareasService
         return array_map(fn ($r) => $this->itemElemento($tipo, (int) $r->id, (string) $r->ref, $r->empresa, $r->titulo), DB::select($sql, $b));
     }
 
-    private function itemElemento(string $tipo, int $id, string $ref, ?string $empresa, ?string $titulo, ?string $estado = null): array
+    private function itemElemento(string $tipo, int $id, string $ref, ?string $empresa, ?string $titulo, ?string $estado = null, ?int $fkSoc = null): array
     {
         $c = self::TIPOS[$tipo];
 
-        return ['tipo' => $tipo, 'tipoNombre' => $c['nombre'], 'icono' => $c['icono'], 'card' => $c['card'], 'modulo' => $c['modulo'], 'id' => $id, 'ref' => $ref, 'empresa' => $empresa ?: ($tipo === 'cliente' ? $ref : ''), 'titulo' => $titulo ? mb_strimwidth(trim(strip_tags($titulo)), 0, 100, '…') : '', 'estado' => $estado];
+        return ['fkSoc' => $fkSoc, 'tipo' => $tipo, 'tipoNombre' => $c['nombre'], 'icono' => $c['icono'], 'card' => $c['card'], 'modulo' => $c['modulo'], 'id' => $id, 'ref' => $ref, 'empresa' => $empresa ?: ($tipo === 'cliente' ? $ref : ''), 'titulo' => $titulo ? mb_strimwidth(trim(strip_tags($titulo)), 0, 100, '…') : '', 'estado' => $estado];
     }
 
     /**
@@ -144,8 +144,8 @@ class TareasService
             $join = $c['soc'] === 't.rowid' || $c['soc'] === 'NULL' ? '' : " LEFT JOIN {$this->p}societe s ON s.rowid = {$c['soc']}";
             $empresa = $tipo === 'cliente' ? 't.nom' : ($join ? 's.nom' : 'NULL');
             $in = implode(',', array_fill(0, count($ids), '?'));
-            foreach (DB::select("SELECT t.rowid id, {$c['ref']} ref, {$empresa} empresa, {$c['titulo']} titulo FROM {$this->p}{$c['tabla']} t{$join} WHERE t.rowid IN ({$in})", array_values($ids)) as $r) {
-                $out["{$tipo}:{$r->id}"] = $this->itemElemento($tipo, (int) $r->id, (string) $r->ref, $r->empresa, $r->titulo);
+            foreach (DB::select("SELECT t.rowid id, {$c['ref']} ref, {$empresa} empresa, {$c['titulo']} titulo, {$c['soc']} fk_soc FROM {$this->p}{$c['tabla']} t{$join} WHERE t.rowid IN ({$in})", array_values($ids)) as $r) {
+                $out["{$tipo}:{$r->id}"] = $this->itemElemento($tipo, (int) $r->id, (string) $r->ref, $r->empresa, $r->titulo, null, $r->fk_soc ? (int) $r->fk_soc : null);
             }
         }
 
@@ -268,7 +268,7 @@ class TareasService
             return [
                 'id' => (int) $f->id, 'origen' => 'tarea', 'tarea' => (int) $f->id,
                 'modulo' => $e['modulo'] ?? null, 'moduloNombre' => $e['tipoNombre'] ?? 'Tarea', 'card' => $e['card'] ?? 4, 'icono' => $e['icono'] ?? 'fa-list-check',
-                'fkRecord' => $e ? $e['id'] : 0, 'ref' => $e['ref'] ?? '', 'empresa' => $e ? ($e['empresa'] ?: $e['titulo']) : 'Tarea libre',
+                'fkRecord' => $e ? $e['id'] : 0, 'fkSoc' => $e['fkSoc'] ?? null, 'ref' => $e['ref'] ?? '', 'empresa' => $e ? ($e['empresa'] ?: $e['titulo']) : 'Tarea libre',
                 'titulo' => $f->title, 'cuando' => $cuando->format('Y-m-d H:i'),
                 'grupo' => ! $pend ? 'realizado' : ($cuando->lt($hoy) ? 'atrasado' : ($cuando->lt($hoy->copy()->addDay()) ? 'hoy' : 'proximo')),
                 'horaVencida' => $pend && $cuando->lt($ahora),

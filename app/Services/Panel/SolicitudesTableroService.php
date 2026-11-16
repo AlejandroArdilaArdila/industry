@@ -196,7 +196,7 @@ class SolicitudesTableroService
             $estados[] = ['id' => $e, 'nombre' => SolicitudesGridController::ESTADOS[(string) $e] ?? "Estado $e"];
         }
 
-        return ['columnas' => $columnas, 'estados' => $estados, 'estadosTablero' => array_map(fn ($e) => ['id' => $e, 'nombre' => SolicitudesGridController::ESTADOS[(string) $e] ?? "Estado $e"], self::ESTADOS_TABLERO)];
+        return ['urgencias' => $this->opcionesUrgencia(), 'columnas' => $columnas, 'estados' => $estados, 'estadosTablero' => array_map(fn ($e) => ['id' => $e, 'nombre' => SolicitudesGridController::ESTADOS[(string) $e] ?? "Estado $e"], self::ESTADOS_TABLERO)];
     }
 
     /**
@@ -244,20 +244,103 @@ class SolicitudesTableroService
         }
         $desde = "FROM {$this->p}solicitudes_solicitud t
             LEFT JOIN {$this->p}societe s ON s.rowid = t.fk_soc
-            LEFT JOIN {$this->p}user u ON u.rowid = t.fk_user_creat";
+            LEFT JOIN {$this->p}user u ON u.rowid = t.fk_user_creat
+            LEFT JOIN {$this->p}user ug ON ug.rowid = t.fk_user_gestion";
         $total = (int) (DB::selectOne("SELECT COUNT(*) n $desde WHERE $where", $b)->n ?? 0);
 
         // Primero lo más urgente: en «Por contactar» el contacto más vencido; en las demás, la mayor mora.
-        $filas = DB::select("SELECT t.rowid, t.ref, t.fk_soc, s.nom cliente, t.asunto, t.status, t.envio_email,
-                t.fecha_solicitud, t.date_creation, t.fecha_proximo_contacto, t.ultima_respuesta,
-                DATEDIFF(CURDATE(), DATE(t.date_creation)) mora,
-                CONCAT_WS(' ', u.firstname, u.lastname) creador,
-                (SELECT COUNT(*) FROM {$this->p}solicitudes_solicitudline l WHERE l.fk_solicitud = t.rowid) productos,
-                (SELECT o.mensaje FROM {$this->p}observaciones_solicitudes o WHERE o.fk_solicitud = t.rowid ORDER BY o.rowid DESC LIMIT 1) ultimo_mensaje,
-                (SELECT o.tms FROM {$this->p}observaciones_solicitudes o WHERE o.fk_solicitud = t.rowid ORDER BY o.rowid DESC LIMIT 1) ultimo_fecha
-            $desde WHERE $where ORDER BY ".($clave === 'contactar' ? 't.fecha_proximo_contacto ASC, ' : '')."mora DESC, t.rowid DESC LIMIT ".self::POR_COLUMNA.' OFFSET '.max(0, $skip), $b);
+        $filas = DB::select($this->selectTarjetas()." $desde WHERE $where ORDER BY ".($clave === 'contactar' ? 't.fecha_proximo_contacto ASC, ' : '')."mora DESC, t.rowid DESC LIMIT ".self::POR_COLUMNA.' OFFSET '.max(0, $skip), $b);
 
         return ['total' => $total, 'items' => array_map(fn ($o) => $this->tarjeta($o), $filas)];
+    }
+
+    /** SELECT de una tarjeta de solicitud (se completa con FROM/WHERE del llamador). */
+    private function selectTarjetas(): string
+    {
+        return "SELECT t.rowid, t.ref, t.fk_soc, s.nom cliente, t.asunto, t.status, t.envio_email,
+                t.fecha_solicitud, t.date_creation, t.fecha_proximo_contacto, t.ultima_respuesta,
+                DATEDIFF(CURDATE(), DATE(t.date_creation)) mora,
+                t.fecha_reapertura,
+                DATEDIFF(CURDATE(), DATE(COALESCE(t.fecha_reapertura, t.fecha_solicitud, t.date_creation))) mora_total,
+                COALESCE(t.fecha_solicitud, t.date_creation) ingreso,
+                CONCAT_WS(' ', u.firstname, u.lastname) creador,
+                CONCAT_WS(' ', ug.firstname, ug.lastname) gestor,
+                (SELECT p.prioridad_nueva FROM {$this->p}informessolu_tablero_prioridad p WHERE p.modulo = 'solicitud' AND p.fk_record = t.rowid AND p.tipo = 'urgencia'
+                    AND p.prioridad_nueva IS NOT NULL AND p.prioridad_nueva <> '' ORDER BY p.date_creation DESC, p.rowid DESC LIMIT 1) urgencia,
+                (SELECT CONCAT_WS(' ', uo.firstname, uo.lastname) FROM {$this->p}observaciones_solicitudes o INNER JOIN {$this->p}user uo ON uo.rowid = o.fk_user_creat
+                    WHERE o.fk_solicitud = t.rowid ORDER BY o.rowid DESC LIMIT 1) ultimo_autor,
+                (SELECT COUNT(*) FROM {$this->p}solicitudes_solicitudline l WHERE l.fk_solicitud = t.rowid) productos,
+                (SELECT o.mensaje FROM {$this->p}observaciones_solicitudes o WHERE o.fk_solicitud = t.rowid ORDER BY o.rowid DESC LIMIT 1) ultimo_mensaje,
+                (SELECT o.tms FROM {$this->p}observaciones_solicitudes o WHERE o.fk_solicitud = t.rowid ORDER BY o.rowid DESC LIMIT 1) ultimo_fecha";
+    }
+
+    /** Tarjetas de solicitudes por id (para las listas del dashboard). @return array<int, array> por id */
+    public function porIds(array $ids): array
+    {
+        if (! $ids) {
+            return [];
+        }
+        $in = implode(',', array_map('intval', $ids));
+        $desde = "FROM {$this->p}solicitudes_solicitud t
+            LEFT JOIN {$this->p}societe s ON s.rowid = t.fk_soc
+            LEFT JOIN {$this->p}user u ON u.rowid = t.fk_user_creat
+            LEFT JOIN {$this->p}user ug ON ug.rowid = t.fk_user_gestion";
+        $out = [];
+        foreach (DB::select($this->selectTarjetas()." {$desde} WHERE t.rowid IN ({$in})") as $o) {
+            $out[(int) $o->rowid] = $this->tarjeta($o);
+        }
+
+        return $out;
+    }
+
+    /** @var array<string, string>|null */
+    private ?array $coloresUrgencia = null;
+
+    private ?array $umbral = null;
+
+    /** Urgencia (Alta / Media / Baja) con su color de la leyenda; null si la solicitud no tiene. */
+    private function urgencia(?string $valor): ?array
+    {
+        $valor = trim((string) $valor);
+        if ($valor === '') {
+            return null;
+        }
+        $this->coloresUrgencia ??= app(PanelDashboardService::class)->coloresLeyenda('urgencia');
+
+        return ['valor' => $valor, 'color' => $this->coloresUrgencia[$valor] ?? '#64748b'];
+    }
+
+    /** Salud según los días de mora y los umbrales de la leyenda (card 1 = solicitudes). */
+    private function salud(int $dias): array
+    {
+        $u = $this->umbral ??= app(PanelDashboardService::class)->umbralesCard(1);
+        $k = $dias >= $u['mora'] ? 'mora' : ($dias >= $u['riesgoMin'] && $dias <= $u['riesgoMax'] ? 'riesgo' : 'aldia');
+
+        return ['clave' => $k, 'nombre' => ['mora' => 'En mora', 'riesgo' => 'En riesgo', 'aldia' => 'Al día'][$k], 'color' => $u['colores'][$k]];
+    }
+
+    /** Fija la urgencia de una solicitud (queda en el historial de prioridades, como en el tablero de Dolibarr). */
+    public function fijarUrgencia(object $usuario, object $sol, string $valor): array
+    {
+        $colores = app(PanelDashboardService::class)->coloresLeyenda('urgencia');
+        if (! isset($colores[$valor])) {
+            throw new InvalidArgumentException('Urgencia inválida.');
+        }
+        $anterior = (string) (DB::selectOne("SELECT prioridad_nueva v FROM {$this->p}informessolu_tablero_prioridad WHERE modulo = 'solicitud' AND fk_record = ? AND tipo = 'urgencia' AND prioridad_nueva <> '' ORDER BY date_creation DESC, rowid DESC LIMIT 1", [$sol->rowid])->v ?? '');
+        if ($anterior !== $valor) {
+            DB::table('informessolu_tablero_prioridad')->insert([
+                'modulo' => 'solicitud', 'fk_record' => $sol->rowid, 'tipo' => 'urgencia', 'prioridad_anterior' => $anterior,
+                'prioridad_nueva' => $valor, 'motivo' => '', 'fk_user' => $usuario->getKey(), 'date_creation' => now(),
+            ]);
+        }
+
+        return $this->urgencia($valor);
+    }
+
+    /** Opciones de urgencia con su color (para el menú de la tarjeta). */
+    public function opcionesUrgencia(): array
+    {
+        return collect(app(PanelDashboardService::class)->coloresLeyenda('urgencia'))->map(fn ($c, $v) => ['valor' => $v, 'color' => $c])->values()->all();
     }
 
     private function tarjeta(object $o): array
@@ -281,7 +364,14 @@ class SolicitudesTableroService
             'correoEnviado' => (bool) $o->envio_email,
             'productos' => (int) $o->productos,
             'creador' => $o->creador,
-            'ultimoSeguimiento' => $texto !== '' ? ['texto' => mb_strimwidth($texto, 0, 140, '…'), 'fecha' => $o->ultimo_fecha ? substr((string) $o->ultimo_fecha, 0, 10) : null] : null,
+            'ultimoSeguimiento' => $texto !== '' ? ['texto' => mb_strimwidth($texto, 0, 140, '…'), 'fecha' => $o->ultimo_fecha ? substr((string) $o->ultimo_fecha, 0, 10) : null, 'autor' => trim((string) $o->ultimo_autor)] : null,
+            // Datos de la tarjeta de referencia: urgencia, salud (al día / en riesgo / en mora), mora desde la reapertura, ingreso y gestor.
+            'urgencia' => $this->urgencia($o->urgencia),
+            'salud' => $this->salud(max(0, (int) $o->mora_total)),
+            'moraTotal' => max(0, (int) $o->mora_total),
+            'reabierta' => $o->fecha_reapertura ? substr((string) $o->fecha_reapertura, 0, 10) : null,
+            'ingreso' => $o->ingreso ? substr((string) $o->ingreso, 0, 10) : null,
+            'gestor' => trim((string) ($o->gestor ?: $o->creador)),
         ];
     }
 

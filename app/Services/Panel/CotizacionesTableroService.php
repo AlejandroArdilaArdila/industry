@@ -84,7 +84,9 @@ class CotizacionesTableroService
                 om.mensaje ultimo_mensaje, ob.ult ultimo_fecha
             $desde WHERE $where ORDER BY ".'mora DESC, t.rowid DESC LIMIT '.self::POR_COLUMNA.' OFFSET '.max(0, $skip), $b);
 
-        return ['total' => $total, 'items' => array_map(function ($o) {
+        $extra = app(TarjetasDocumentoService::class)->cotizaciones(array_map(fn ($o) => (int) $o->rowid, $filas));
+
+        return ['total' => $total, 'items' => array_map(function ($o) use ($extra) {
             $texto = ActividadesService::decodificar($o->ultimo_mensaje);
             $hasta = $o->fecha && (int) $o->validez_oferta > 0 ? substr((string) $o->valida_hasta, 0, 10) : null;
 
@@ -100,6 +102,7 @@ class CotizacionesTableroService
                 'fecha' => $o->fecha ? substr((string) $o->fecha, 0, 10) : null,
                 'validaHasta' => $hasta,
                 'vencida' => $hasta !== null && $hasta < now(ActividadesService::TZ)->toDateString(),
+                'tarjeta' => $extra[(int) $o->rowid] ?? null,
                 'valor' => round((float) $o->valor),
                 'creador' => $o->creador,
                 'ultimoSeguimiento' => $texto !== '' ? ['texto' => mb_strimwidth($texto, 0, 140, '…'), 'fecha' => $o->ultimo_fecha ? substr((string) $o->ultimo_fecha, 0, 10) : null] : null,

@@ -210,6 +210,30 @@ class MicrosoftSyncService
         }
     }
 
+    /** Recordatorio (actioncomm) pospuesto: se mueve su evento y la tarea de To Do. */
+    public function reprogramarRecordatorio(int $eventoId): void
+    {
+        $v = DB::table('panel_ms_vinculos')->where('actioncomm_id', $eventoId)->first();
+        $cuenta = $v ? $this->cuenta((int) $v->user_id) : null;
+        $ev = $v ? $this->evento($eventoId) : null;
+        if (! $cuenta || ! $ev) {
+            return;
+        }
+        $inicio = Carbon::parse($ev->datep, ActividadesService::TZ);
+        try {
+            $http = $this->graph->http($cuenta);
+            if ($v->ms_evento_id) {
+                $this->graph->revisar($http->patch("/me/events/{$v->ms_evento_id}", ['start' => $this->fecha($inicio), 'end' => $this->fecha($inicio->copy()->addMinutes(self::DURACION_MIN))]));
+            }
+            if ($v->ms_tarea_id && $cuenta->lista_tareas_id) {
+                $this->graph->revisar($http->patch("/me/todo/lists/{$cuenta->lista_tareas_id}/tasks/{$v->ms_tarea_id}", ['dueDateTime' => $this->fecha($inicio), 'reminderDateTime' => $this->fecha($inicio)]));
+            }
+            DB::table('panel_ms_vinculos')->where('id', $v->id)->update(['huella' => $this->huella($ev->label, $inicio), 'updated_at' => now()]);
+        } catch (Throwable $e) {
+            Log::warning("Microsoft: no se pudo reprogramar el recordatorio {$eventoId} — ".$e->getMessage());
+        }
+    }
+
     /** Tarea eliminada: se borra el evento de Outlook y la tarea de To Do de cada integrante. Llamar ANTES de borrar los vínculos. */
     public function eliminarTarea(int $tareaId, ?int $soloUsuario = null): void
     {

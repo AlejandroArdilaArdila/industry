@@ -1,6 +1,6 @@
 @extends('panel.layouts.app')
 
-@section('title', 'Panel')
+@section('title', 'Mi tablero de soluciones')
 @section('contentClass', 'p-0')
 
 @section('content')
@@ -15,8 +15,8 @@
         {{-- Cabecera --}}
         <div class="mb-5 flex flex-wrap items-end justify-between gap-4">
             <div>
-                <h1 class="text-2xl font-extrabold tracking-tight sm:text-3xl" id="d-saludo">Hola, {{ $user->full_name }}</h1>
-                <p class="mt-1 text-sm text-muted-foreground" id="d-subtitulo">&nbsp;</p>
+                <h1 class="text-2xl font-extrabold tracking-tight sm:text-3xl" id="d-saludo">Mi tablero de soluciones</h1>
+                <p class="mt-1 text-sm text-muted-foreground"><b class="font-semibold text-foreground" id="d-hola">Hola, {{ $user->full_name }}</b> · <span id="d-subtitulo">&nbsp;</span></p>
             </div>
             <div class="flex flex-wrap items-center gap-2">
                 <div class="dash-seg" id="d-periodos" role="tablist">
@@ -26,6 +26,7 @@
                 </div>
                 <select id="d-vendedor" class="dash-select hidden" aria-label="Vendedor"></select>
                 <span class="dash-live" id="d-live"><i></i><span id="d-live-txt">Cargando…</span></span>
+                <button type="button" id="d-mi-dia" class="dash-btn" title="Qué gestionar hoy"><i class="fa-solid fa-sun"></i> Mi día</button>
                 <button type="button" id="d-auto" class="dash-btn" title="Actualizar cada 60 s"><i class="fa-solid fa-bolt"></i> Auto</button>
                 <button type="button" id="d-refrescar" class="dash-btn" title="Actualizar (R)"><i class="fa-solid fa-rotate"></i> Actualizar</button>
             </div>
@@ -64,7 +65,9 @@
 
         {{-- Flujo comercial (pestañas por etapa) + programador de actividades --}}
         <div class="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-3">
-            <section class="dash-card et-card xl:col-span-2" id="d-etapas-card" style="--i:6">
+            <section class="dash-card et-card cargando-velo xl:col-span-2" id="d-etapas-card" style="--i:6">
+                {{-- Preloading: cubre todo el flujo comercial hasta tener los datos; después arranca la presentación de las etapas. --}}
+                <div class="et-velo" role="status" aria-live="polite"><span class="tf-spin"></span><b>Cargando el tablero comercial…</b><small>Solicitudes · Cotización · Órdenes de compra · Entrega</small></div>
                 <header class="dash-h">
                     <h2><i class="fa-solid fa-layer-group text-primary"></i> Flujo comercial <small id="d-et-sub">&nbsp;</small></h2>
                     <div class="flex items-center gap-2">
@@ -163,6 +166,12 @@
     'urlColores' => $user->isAdmin() ? route('panel.dashboard.colores') : null,
     'urlActividades' => route('panel.actividades.index'),
     'urlPanelActividades' => route('panel.actividades.panel'),
+    'urlPlanDia' => route('panel.plan-dia'),
+    'userId' => (int) $user->getKey(),
+    'urlAlertas' => route('panel.alertas.index'),
+    'urlAlertasSilenciar' => route('panel.alertas.silenciar'),
+    'urlTareaPosponer' => route('panel.tareas.posponer', ['tarea' => '__ID__']),
+    'urlEventoPosponer' => route('panel.actividades.posponer', ['evento' => '__ID__']),
     'urlTareaForm' => route('panel.tareas.formulario'),
     'urlTareaShow' => route('panel.tareas.show', ['tarea' => '__ID__']),
     'urlTareaEstado' => route('panel.tareas.estado', ['tarea' => '__ID__']),

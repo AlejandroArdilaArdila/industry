@@ -75,6 +75,24 @@ class SolicitudesTableroController extends Controller
         return response()->json(['ok' => true, 'message' => 'Solicitud '.$sol->ref.' → '.(SolicitudesGridController::ESTADOS[(string) $d['estado']] ?? '')]);
     }
 
+    /** Fija la urgencia (Alta / Media / Baja) desde la tarjeta. */
+    public function urgencia(Request $request, int $solicitud): JsonResponse
+    {
+        $usuario = Auth::guard('web')->user();
+        abort_unless($this->ficha->puedeEditar($usuario), 403, 'No tienes permiso para modificar solicitudes.');
+        $sol = $this->ficha->solicitud($solicitud);
+        abort_unless($sol && $this->ficha->puedeVer($usuario, $sol), 404, 'Solicitud no encontrada.');
+        $d = $request->validate(['valor' => 'required|string|max:30']);
+
+        try {
+            $u = $this->tablero->fijarUrgencia($usuario, $sol, $d['valor']);
+        } catch (InvalidArgumentException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
+
+        return response()->json(['ok' => true, 'urgencia' => $u, 'message' => 'Urgencia '.$d['valor'].' en '.$sol->ref]);
+    }
+
     /** Motivos de cierre para el diálogo que aparece al soltar una tarjeta en «Cerradas». */
     public function motivos(): JsonResponse
     {

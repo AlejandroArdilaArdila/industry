@@ -6,8 +6,10 @@ use App\Http\Controllers\Panel\Categorias\CategoriasGridController;
 use App\Http\Controllers\Panel\Categorias\CategoriasPageController;
 use App\Http\Controllers\Panel\PanelAuthController;
 use App\Http\Controllers\Panel\ActividadesController;
+use App\Http\Controllers\Panel\AlertasController;
 use App\Http\Controllers\Panel\MicrosoftController;
 use App\Http\Controllers\Panel\PanelDashboardController;
+use App\Http\Controllers\Panel\PlanDiaController;
 use App\Http\Controllers\Panel\TareasController;
 use App\Http\Controllers\Panel\TrmController;
 use App\Http\Controllers\Panel\Facturas\FacturasGridController;
@@ -76,6 +78,10 @@ Route::prefix('panel')->name('panel.')->middleware('auth:web')->group(function (
         Route::delete('/', [MicrosoftController::class, 'desconectar'])->name('desconectar');
     });
 
+    Route::get('/plan-dia', [PlanDiaController::class, 'index'])->name('plan-dia');
+    Route::get('/alertas', [AlertasController::class, 'index'])->name('alertas.index');
+    Route::post('/alertas/silenciar', [AlertasController::class, 'silenciar'])->name('alertas.silenciar');
+
     Route::prefix('tareas')->name('tareas.')->group(function () {
         Route::get('/formulario', [TareasController::class, 'formulario'])->name('formulario');
         Route::get('/elementos', [TareasController::class, 'elementos'])->name('elementos');
@@ -95,6 +101,7 @@ Route::prefix('panel')->name('panel.')->middleware('auth:web')->group(function (
         Route::get('/cliente-meses', [ActividadesController::class, 'clienteMeses'])->name('cliente-meses');
         Route::post('/', [ActividadesController::class, 'store'])->name('store');
         Route::put('/{evento}/estado', [ActividadesController::class, 'estado'])->whereNumber('evento')->name('estado');
+        Route::put('/{evento}/posponer', [ActividadesController::class, 'posponer'])->whereNumber('evento')->name('posponer');
     });
 
     Route::prefix('solicitudes')->name('solicitudes.')->group(function () {
@@ -117,6 +124,7 @@ Route::prefix('panel')->name('panel.')->middleware('auth:web')->group(function (
         Route::put('/tablero/columnas', [SolicitudesTableroController::class, 'guardarColumnas'])->name('tablero.columnas.guardar');
         Route::get('/tablero/{columna}', [SolicitudesTableroController::class, 'columna'])->where('columna', '[a-z]+')->name('tablero.columna');
         Route::post('/{solicitud}/mover', [SolicitudesTableroController::class, 'mover'])->whereNumber('solicitud')->name('mover');
+        Route::put('/{solicitud}/urgencia', [SolicitudesTableroController::class, 'urgencia'])->whereNumber('solicitud')->name('urgencia');
         Route::post('/export/xlsx', [SolicitudesGridController::class, 'exportXlsx'])->name('export.xlsx');
         Route::post('/export/csv', [SolicitudesGridController::class, 'exportCsv'])->name('export.csv');
 

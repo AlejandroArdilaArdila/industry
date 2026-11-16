@@ -180,11 +180,15 @@ class PanelDashboardService
                     $b[] = $uid;
                 }
 
+                // Señales del día a día de la etapa (por contactar, sin movimiento, pendientes de pago…), en la misma consulta.
+                $plan = app(PlanDiaService::class);
+                $condSenales = $plan->condiciones($clave);
+                $extraSenales = ', '.implode(', ', array_map(fn ($k, $c) => "COALESCE(SUM({$c}),0) s_{$k}", array_keys($condSenales), $condSenales));
                 $vb = array_merge([$ventDesde->toDateString(), $ventHasta->toDateString()], $b);
                 $ventanaW = "DATE({$def['creacion']}) BETWEEN ? AND ?";
                 $activos = DB::selectOne("SELECT COUNT(*) n, ".($def['valor'] ? "COALESCE(SUM({$def['valor']}),0)" : '0')." v,
                         COALESCE(SUM(DATEDIFF(NOW(), {$def['refFecha']}) >= {$umb[$meta['card']]['mora']}),0) mora,
-                        COALESCE(SUM(DATEDIFF(NOW(), {$def['refFecha']}) BETWEEN {$umb[$meta['card']]['riesgoMin']} AND {$umb[$meta['card']]['riesgoMax']}),0) riesgo
+                        COALESCE(SUM(DATEDIFF(NOW(), {$def['refFecha']}) BETWEEN {$umb[$meta['card']]['riesgoMin']} AND {$umb[$meta['card']]['riesgoMax']}),0) riesgo".$extraSenales."
                     FROM {$def['from']} WHERE {$def['activo']} AND {$ventanaW}{$duenio}", $vb);
 
                 // Reparto por estado de los documentos activos (para la dona de la etapa).
@@ -247,6 +251,7 @@ class PanelDashboardService
                     'resumen' => $resumen,
                     'mora' => ['mora' => (int) $activos->mora, 'riesgo' => (int) $activos->riesgo, 'aldia' => max(0, (int) $activos->n - (int) $activos->mora - (int) $activos->riesgo), 'umbral' => $umb[$meta['card']]['mora'], 'colores' => $umb[$meta['card']]['colores']],
                     'valorActivo' => $def['valor'] ? round((float) $activos->v) : null,
+                    'senales' => $plan->senales(collect($condSenales)->mapWithKeys(fn ($c, $k) => [$k => (int) ($activos->{"s_{$k}"} ?? 0)])->all()),
                     'total' => array_sum($serie['cantidades']),
                     'totalPrevio' => array_sum($serie['previosCantidades']),
                     'monto' => $def['valor'] ? array_sum($serie['montos']) : null,
@@ -346,6 +351,24 @@ class PanelDashboardService
         }
 
         return $out;
+    }
+
+    /** Definición SQL de una etapa (from, activo, dueño, fecha de referencia, valor…), para servicios que la reutilizan. */
+    public function definicion(string $clave): array
+    {
+        return $this->definicionEtapa($clave, app(ActividadesService::class)->campoUsuario());
+    }
+
+    /** Umbrales (días de mora / riesgo) y colores de salud de una card (1 = solicitudes), tal como están en la leyenda del tablero. */
+    public function umbralesCard(int $card): array
+    {
+        return $this->umbrales()[$card];
+    }
+
+    /** Colores de la leyenda por categoría (p. ej. «urgencia» → Alta/Media/Baja). @return array<string, string> */
+    public function coloresLeyenda(string $categoria): array
+    {
+        return $this->leyenda()[$categoria]['items'] ?? [];
     }
 
     private function nivelMora(int $dias, array $u): string
@@ -768,7 +791,7 @@ class PanelDashboardService
             'solicitud' => "t.rowid id, t.rowid doc, t.ref, t.status, t.asunto titulo, t.total_ttc valor, t.fecha_proximo_contacto proximo",
             'cotizacion' => "t.rowid id, t.rowid doc, t.ref, t.status, t.label titulo, {$def['valor']} valor, NULL proximo",
             'orden' => "t.rowid id, t.rowid doc, t.ref, t.status, t.asunto titulo, {$def['valor']} valor, NULL proximo",
-            default => "t.rowid id, o.rowid doc, o.ref, 0 status, CONCAT_WS(' · ', NULLIF(t.transporte,''), NULLIF(t.guia,''), NULLIF(t.estado,'')) titulo, NULL valor, NULL proximo",
+            default => "t.rowid id, o.rowid doc, o.ref, 0 status, CONCAT_WS(' · ', NULLIF(t.transporte,''), NULLIF(t.guia,''), NULLIF(t.estado,'')) titulo, NULL valor, NULL proximo, t.transporte guia_tr, t.guia guia_num, t.estado guia_est",
         };
         $rows = DB::select("SELECT {$campos}, DATEDIFF(NOW(), {$def['refFecha']}) dias, {$def['refFecha']} fecha, s.nom empresa, TRIM(CONCAT_WS(' ', u.firstname, u.lastname)) gestor
             FROM {$def['from']} LEFT JOIN {$p}societe s ON s.rowid = {$def['socio']} LEFT JOIN {$p}user u ON u.rowid = {$def['duenio']}
@@ -792,6 +815,15 @@ class PanelDashboardService
         $estados = ['solicitud' => [1 => 'Activa', 2 => 'Cot. Exterior', 3 => 'Cot. Local', 4 => 'Import', 5 => 'Enviada', 6 => 'Cot. USA'], 'cotizacion' => [1 => 'Activada', 2 => 'Enviada'],
             'orden' => [1 => 'Activa', 2 => 'Pago', 3 => 'Enviada', 6 => 'Aprob. Sol.', 7 => 'Aprobada', 15 => 'Liq. Sol.', 16 => 'Liquidada', 17 => 'Desemb. Sol.', 18 => 'Desemb. Apr.', 20 => 'Pago Confirm.', 32 => 'En revisión', 33 => 'Recolección', 34 => 'Env. Programar', 35 => 'Programado', 36 => 'Reprogramando', 37 => 'Reprogramado']];
 
+        // Datos de la tarjeta completa de cada etapa (formato del tablero de Dolibarr).
+        $docIds = array_values(array_unique(array_map(fn ($r) => (int) $r->doc, $rows)));
+        $tarjetas = match ($clave) {
+            'solicitud' => app(SolicitudesTableroService::class)->porIds($docIds),
+            'cotizacion' => app(TarjetasDocumentoService::class)->cotizaciones($docIds),
+            'orden' => app(TarjetasDocumentoService::class)->ordenes($docIds, 3),
+            default => app(TarjetasDocumentoService::class)->ordenes($docIds, 4),
+        };
+
         return [
             'total' => $total,
             'umbral' => $umb['mora'],
@@ -801,6 +833,8 @@ class PanelDashboardService
                 'titulo' => mb_strimwidth(trim(preg_replace('/\s+/', ' ', strip_tags(html_entity_decode((string) $r->titulo)))), 0, 110, '…'), 'valor' => $r->valor ? round((float) $r->valor) : null,
                 'estado' => $clave === 'entrega' ? null : ($estados[$clave][(int) $r->status] ?? null), 'dias' => max(0, (int) $r->dias), 'proximo' => $r->proximo ? substr((string) $r->proximo, 0, 10) : null, 'desde' => $r->fecha ? substr((string) $r->fecha, 0, 10) : null,
                 'nivel' => $this->nivelMora(max(0, (int) $r->dias), $umb), 'clasif' => $clasif[(int) $r->doc] ?? [],
+                'tarjeta' => $tarjetas[(int) $r->doc] ?? null,
+                'guiaFila' => $clave === 'entrega' ? ['transporte' => trim((string) ($r->guia_tr ?? '')), 'numero' => trim((string) ($r->guia_num ?? '')), 'estado' => (string) ($r->guia_est ?? '')] : null,
             ], $rows),
         ];
     }

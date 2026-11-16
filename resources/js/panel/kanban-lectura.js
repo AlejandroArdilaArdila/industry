@@ -114,10 +114,10 @@ export function iniciarKanban({ raiz, columnas, urlColumna, tarjeta, alAccion, s
     cuerpo.addEventListener('click', (ev) => {
         const a = ev.target.closest('[data-acc]');
         if (a?.dataset.acc === 'mas') { cargar(a.closest('.kb-col').dataset.col, true); return; }
-        const tarj = ev.target.closest('.kb-card');
+        const tarj = ev.target.closest('.kb-card, .td');
         if (!tarj) return;
         ev.preventDefault();
-        const h = buscar(Number(tarj.dataset.id));
+        const h = buscar(Number(tarj.dataset.id ?? tarj.dataset.doc));
         if (!h) return;
         const acc = a?.dataset.acc ?? 'abrir';
         if (acc === 'seguimiento' && seguimiento) seguimientoRapido(a, h.s, h.origen);

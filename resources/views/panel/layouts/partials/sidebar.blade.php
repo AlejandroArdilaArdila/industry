@@ -1,6 +1,6 @@
 @php
     $navItems = [
-        ['route' => 'panel.dashboard', 'active' => request()->routeIs('panel.dashboard'), 'icon' => 'fa-solid fa-gauge', 'label' => 'Dashboard'],
+        ['route' => 'panel.dashboard', 'active' => request()->routeIs('panel.dashboard'), 'icon' => 'fa-solid fa-gauge', 'label' => 'Mi tablero de soluciones'],
         ['route' => 'panel.solicitudes.index', 'active' => request()->routeIs('panel.solicitudes.*'), 'icon' => 'fa-solid fa-inbox', 'label' => 'Solicitudes'],
         ['route' => 'panel.localizacion.index', 'active' => request()->routeIs('panel.localizacion.*'), 'icon' => 'fa-solid fa-location-dot', 'label' => 'Localización'],
         ['route' => 'panel.cotizaciones.index', 'active' => request()->routeIs('panel.cotizaciones.*'), 'icon' => 'fa-solid fa-file-invoice-dollar', 'label' => 'Cotizaciones'],

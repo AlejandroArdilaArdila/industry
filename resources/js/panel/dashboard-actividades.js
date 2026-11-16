@@ -7,9 +7,9 @@ import { esc, fecha, hora, isoLocal, COLORES_CARD } from './dashboard-util.js';
 
 const $ = (id) => document.getElementById(id);
 
-export function iniciarActividades({ url, panelUrl, csrf, ms: msCfg, tareas: tareasCfg }) {
+export function iniciarActividades({ url, panelUrl, csrf, ms: msCfg, tareas: tareasCfg, onCambio }) {
     const s = { vista: 'pendientes', datos: null, dia: null, colores: COLORES_CARD, externos: [], cacheExt: new Map(), filtro: null, modo: 'semana', sem: 0, mes: new Date(new Date().getFullYear(), new Date().getMonth(), 1) };
-    const modal = new ActividadFichaModal({ panelUrl, csrfToken: csrf, onSaved: () => cargar(), tareaFormUrl: tareasCfg?.form, tareaShowUrl: tareasCfg?.show });
+    const modal = new ActividadFichaModal({ panelUrl, csrfToken: csrf, onSaved: () => { cargar(); onCambio?.(); }, tareaFormUrl: tareasCfg?.form, tareaShowUrl: tareasCfg?.show });
 
     const color = (card) => (s.colores[card] ?? COLORES_CARD[card]).fondo;
 
@@ -347,5 +347,5 @@ export function iniciarActividades({ url, panelUrl, csrf, ms: msCfg, tareas: tar
         return null;
     });
 
-    return { cargar, abrir: (modulo, id, lista) => { modal.lista = lista ? { ...lista, vistos: new Set() } : null; return modal.abrirDocumento(modulo, id); }, colores: (c) => { if (c) s.colores = c; } };
+    return { cargar, programar: () => modal.abrirNueva(), filtrar: (f) => { s.vista = 'pendientes'; s.filtro = f || null; s.dia = null; $('d-act-card').scrollIntoView({ behavior: 'smooth', block: 'center' }); return cargar(); }, abrirTarea: (id) => { modal.lista = null; return modal.abrirTarea(id); }, abrir: (modulo, id, lista) => { modal.lista = lista ? { ...lista, vistos: new Set() } : null; return modal.abrirDocumento(modulo, id); }, colores: (c) => { if (c) s.colores = c; } };
 }

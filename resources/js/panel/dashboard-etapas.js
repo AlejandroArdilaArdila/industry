@@ -2,6 +2,7 @@
 // del tablero. Rotan solas con un temporizador circular; el cursor encima (o la pausa manual) lo detiene.
 import { Chart } from 'chart.js';
 import { esc, nf, dineroCorto, fecha, mesCorto, colorTema, alfa, contar } from './dashboard-util.js';
+import { tarjetaDocumento } from './tarjetas-documento.js';
 
 const ROTACION_MS = 8000;
 const $ = (id) => document.getElementById(id);
@@ -19,12 +20,19 @@ export function iniciarEtapas({ url, urlDocumentos, getPeriodo, esAdmin, onAbrir
     const anilloFg = anillo.querySelector('.fg');
     const anilloTxt = anillo.querySelector('span');
 
-    const pausado = () => e.manual || e.encima || !e.visible || document.hidden || !e.datos || Object.values(e.nivel).some(Boolean);
+    const pausado = () => e.manual || (e.encima && !e.forzar) || !e.visible || document.hidden || !e.datos || Object.values(e.nivel).some(Boolean);
 
     function delta(act, prev) {
         if (!prev) return act ? '<span class="chip">Nuevo</span>' : '';
         const d = ((act - prev) / Math.abs(prev)) * 100;
         return `<span class="chip ${d >= 0 ? 'up' : 'down'}"><i class="fa-solid fa-arrow-${d >= 0 ? 'up' : 'down'}"></i> ${Math.abs(d).toFixed(d > 99 ? 0 : 1).replace('.', ',')}%</span>`;
+    }
+
+    /** Lo que importa del día a día de la etapa: valor en juego y las 2 señales más urgentes (por contactar, sin movimiento, pagos pendientes…). */
+    function infoEtapa(x) {
+        const val = x.valorActivo ? `<span class="et-val" title="Valor de los documentos activos"><i class="fa-solid fa-sack-dollar"></i>${esc(dineroCorto(x.valorActivo))}</span>` : '';
+        const sen = (x.senales ?? []).slice(0, 2).map((s) => `<span class="et-sen ${s.tono}" title="${nf.format(s.n)} ${esc(s.texto)}"><i class="fa-solid ${s.icono}"></i><b>${nf.format(s.n)}</b> ${esc(s.texto)}</span>`).join('');
+        return val || sen ? `<span class="et-info">${val}${sen}</span>` : '';
     }
 
     function pintarTabs() {
@@ -33,6 +41,7 @@ export function iniciarEtapas({ url, urlDocumentos, getPeriodo, esAdmin, onAbrir
                 <span class="et-lbl">${esc(x.nombre)}</span>
                 <span class="et-num">${nf.format(x.activos)}<small>${esc(x.etiquetaActivos.toLowerCase())}</small></span>
                 ${x.resumen ? `<span class="et-mini" tabindex="0" data-resumen="${i}">${x.resumen.map((r) => `<span><i style="background:${r.color}"></i>${nf.format(r.n)}</span>`).join('')}</span>` : ''}
+                ${infoEtapa(x)}
             </button>`).join('');
     }
 
@@ -222,6 +231,8 @@ export function iniciarEtapas({ url, urlDocumentos, getPeriodo, esAdmin, onAbrir
         const colores = d.colores;
         const hoy = hoyIso();
         $('d-et-docs').innerHTML = d.items.length ? d.items.map((i, k) => {
+            const nueva = tarjetaDocumento(i); // tarjeta con el formato del tablero de Dolibarr
+            if (nueva) return nueva;
             const c = colores[i.nivel];
             const vencido = i.proximo && i.proximo <= hoy;
             const tag2 = i.modulo === 'solicitud'
@@ -332,7 +343,7 @@ export function iniciarEtapas({ url, urlDocumentos, getPeriodo, esAdmin, onAbrir
 
     // ---- eventos
     card.addEventListener('mouseenter', () => { e.encima = true; });
-    card.addEventListener('mouseleave', () => { e.encima = false; });
+    card.addEventListener('mouseleave', () => { e.encima = false; e.forzar = false; });
     card.addEventListener('focusin', () => { e.encima = true; });
     card.addEventListener('focusout', () => { e.encima = false; });
     new IntersectionObserver(([en]) => { e.visible = en.isIntersecting; }, { threshold: 0.15 }).observe(card);
@@ -353,7 +364,7 @@ export function iniciarEtapas({ url, urlDocumentos, getPeriodo, esAdmin, onAbrir
         docs.espera = setTimeout(() => { docs.q = ev.target.value.trim(); if (e.datos) cargarDocs(e.datos.etapas[e.idx]); }, 300);
     });
     $('d-et-docs').addEventListener('click', (ev) => {
-        const d = ev.target.closest('.et-doc');
+        const d = ev.target.closest('.et-doc, .td');
         if (d) onAbrir?.(d.dataset.modulo, d.dataset.doc);
     });
     $('d-et-metrica').addEventListener('click', (ev) => {
@@ -372,12 +383,17 @@ export function iniciarEtapas({ url, urlDocumentos, getPeriodo, esAdmin, onAbrir
 
     async function cargar() {
         e.ctrl?.abort();
-        e.ctrl = new AbortController();
+        const ctrl = new AbortController();
+        e.ctrl = ctrl;
         card.classList.add('cargando');
+        // Preloading a pantalla completa de la tarjeta solo cuando lo que se ve va a cambiar (primera carga, periodo o alcance),
+        // no en la actualización automática cada minuto.
+        if (!e.datos || e.vistoPeriodo !== getPeriodo() || e.vistoAlcance !== e.alcance) card.classList.add('cargando-velo');
         try {
-            const res = await fetch(`${url}?${new URLSearchParams({ periodo: getPeriodo(), alcance: esAdmin ? e.alcance : 'mios' })}`, { headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' }, signal: e.ctrl.signal });
+            const res = await fetch(`${url}?${new URLSearchParams({ periodo: getPeriodo(), alcance: esAdmin ? e.alcance : 'mios' })}`, { headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' }, signal: ctrl.signal });
             if (!res.ok) throw new Error(`Error ${res.status}`);
             e.datos = await res.json();
+            e.vistoPeriodo = getPeriodo(); e.vistoAlcance = e.alcance;
             e.idx = Math.min(e.idx, e.datos.etapas.length - 1);
             $('d-et-sub').textContent = `${e.datos.periodoLabel} · ${e.datos.alcance === 'mios' ? 'solo tus documentos' : 'todo el equipo'}`;
             docs.cache.clear();
@@ -389,7 +405,8 @@ export function iniciarEtapas({ url, urlDocumentos, getPeriodo, esAdmin, onAbrir
             console.error(err);
             $('d-et-sub').textContent = 'No se pudo cargar el flujo comercial';
         } finally {
-            card.classList.remove('cargando');
+            // Si ya hay otra carga en curso, ella se encarga de quitar el velo.
+            if (e.ctrl === ctrl) card.classList.remove('cargando', 'cargando-velo');
         }
     }
 
@@ -398,6 +415,19 @@ export function iniciarEtapas({ url, urlDocumentos, getPeriodo, esAdmin, onAbrir
         repintar: () => { if (e.datos) pintarEtapa(false); },
         /** «Ver acciones» de la línea de proceso: abre esa etapa en el Flujo comercial. */
         seleccionar: (i) => { if (e.datos) sel(i); },
+        /** Pausa / arranca la rotación automática. `reproducir` la reinicia desde Solicitudes (primera etapa). */
+        pausar: () => { e.manual = true; iconoPausa(); },
+        reproducir: () => { e.manual = false; e.encima = false; e.forzar = true; iconoPausa(); if (e.datos) sel(0); else e.restante = ROTACION_MS; },
+        /** Abre una etapa (y filtra por nivel de mora, si se indica) y la deja pausada para que se revise. */
+        ver: (clave, nivel = '') => {
+            if (!e.datos) return;
+            const i = e.datos.etapas.findIndex((x) => x.clave === clave);
+            if (i < 0) return;
+            e.manual = true; iconoPausa();
+            e.nivel[clave] = nivel;
+            sel(i);
+            card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        },
         colores: () => e.datos?.etapas.map((x) => x.colores),
         /** Vista previa / guardado: aplica { 1..4: {fondo,texto,acento}, 5: {fondo} } sin volver a consultar el servidor. */
         aplicarColores: (mapa) => {

@@ -148,6 +148,19 @@ class ActividadesController extends Controller
         return response()->json(['ok' => true, 'message' => $datos['estado'] === 'REALIZADO' ? 'Actividad marcada como realizada' : 'Actividad reabierta']);
     }
 
+    public function posponer(Request $request, int $evento): JsonResponse
+    {
+        $d = $request->validate(['fecha' => ['required', 'date_format:Y-m-d', 'after_or_equal:'.Carbon::now(ActividadesService::TZ)->toDateString()], 'hora' => ['nullable', 'date_format:H:i']]);
+        try {
+            $this->actividades->posponer($this->usuario(), $evento, $d['fecha'], $d['hora'] ?? null);
+        } catch (InvalidArgumentException $e) {
+            abort(404, $e->getMessage());
+        }
+        $this->microsoft->reprogramarRecordatorio($evento);
+
+        return response()->json(['ok' => true, 'message' => 'Recordatorio reprogramado']);
+    }
+
     /** Los documentos relacionados son un extra: si algo falla no debe tumbar el panel. */
     private function relacionadosSeguros(string $modulo, int $id): array
     {

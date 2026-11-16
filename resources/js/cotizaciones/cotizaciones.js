@@ -5,6 +5,7 @@ import { esc, dineroCorto } from '../panel/dashboard-util.js';
 import { iniciarKanban, fechaCorta, iniciales } from '../panel/kanban-lectura.js';
 import { iniciarProceso } from '../panel/dashboard-proceso.js';
 import { ActividadFichaModal } from '../panel/actividades-ficha.js';
+import { tarjetaDocumento } from '../panel/tarjetas-documento.js';
 
 const config = window.COTIZACIONES_CONFIG;
 const csrf = document.querySelector('meta[name="csrf-token"]')?.content ?? '';
@@ -12,6 +13,9 @@ const NIVEL = (d) => (d <= 30 ? ['verde', 'Al día'] : d <= 90 ? ['ambar', 'Aten
 const COLOR_ESTADO = { 1: '#2563eb', 2: '#0891b2' };
 
 function tarjeta(s) {
+    // Formato del tablero de Dolibarr (urgencia / estado / oportunidad, mora total y de estado actual, ingreso, gestor y valor).
+    const nueva = tarjetaDocumento({ ...s, modulo: 'cotizacion', doc: s.id, empresa: s.cliente });
+    if (nueva) return nueva;
     const [nivel, txt] = NIVEL(s.mora);
     const ultimo = s.ultimoSeguimiento;
 

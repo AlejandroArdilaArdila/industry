@@ -5,6 +5,8 @@ import { Chart, registerables } from 'chart.js';
 import { iniciarEtapas } from './dashboard-etapas.js';
 import { iniciarActividades } from './dashboard-actividades.js';
 import { iniciarLeyenda } from './dashboard-leyenda.js';
+import { iniciarAlertas } from './alertas-vencidas.js';
+import { iniciarPlanDia } from './plan-dia.js';
 import { iniciarColores } from './dashboard-colores.js';
 import { iniciarProceso } from './dashboard-proceso.js';
 
@@ -20,8 +22,37 @@ try {
     if (pref.periodo && document.querySelector(`#d-periodos [data-periodo="${pref.periodo}"]`)) estado.periodo = pref.periodo;
 } catch { /* sin almacenamiento */ }
 
-const actividades = iniciarActividades({ url: cfg.urlActividades, panelUrl: cfg.urlPanelActividades, csrf: cfg.csrf, tareas: { form: cfg.urlTareaForm, show: cfg.urlTareaShow, estado: cfg.urlTareaEstado, eliminar: cfg.urlTareaEliminar, rechazar: cfg.urlTareaRechazar }, ms: cfg.urlMicrosoft ? { estado: cfg.urlMicrosoft, conectar: cfg.urlMicrosoftConectar, prefs: cfg.urlMicrosoftPrefs, sync: cfg.urlMicrosoftSync, eventos: cfg.urlMicrosoftEventos, eventoEliminar: cfg.urlMicrosoftEventoEliminar, eventoRechazar: cfg.urlMicrosoftEventoRechazar, base: cfg.urlMicrosoftBase } : null });
+let alertas = null; // se crea justo después; las acciones del panel lateral lo vuelven a consultar
+const actividades = iniciarActividades({ onCambio: () => alertas?.revisar(), url: cfg.urlActividades, panelUrl: cfg.urlPanelActividades, csrf: cfg.csrf, tareas: { form: cfg.urlTareaForm, show: cfg.urlTareaShow, estado: cfg.urlTareaEstado, eliminar: cfg.urlTareaEliminar, rechazar: cfg.urlTareaRechazar }, ms: cfg.urlMicrosoft ? { estado: cfg.urlMicrosoft, conectar: cfg.urlMicrosoftConectar, prefs: cfg.urlMicrosoftPrefs, sync: cfg.urlMicrosoftSync, eventos: cfg.urlMicrosoftEventos, eventoEliminar: cfg.urlMicrosoftEventoEliminar, eventoRechazar: cfg.urlMicrosoftEventoRechazar, base: cfg.urlMicrosoftBase } : null });
+// Modal de actividades vencidas (tareas y recordatorios atrasados): se gestionan sin salir del dashboard.
+alertas = iniciarAlertas({
+    auto: false, // la primera revisión la hace el modal «Mi día» (si hay vencidas, es su primera sugerencia)
+    url: cfg.urlAlertas, silenciarUrl: cfg.urlAlertasSilenciar, csrf: cfg.csrf,
+    urls: { tareaEstado: cfg.urlTareaEstado, tareaPosponer: cfg.urlTareaPosponer, eventoPosponer: cfg.urlEventoPosponer },
+    abrirTarea: (id) => actividades.abrirTarea(id), abrirDocumento: (m, id) => actividades.abrir(m, id), onCambio: () => actividades.cargar(),
+});
 const etapas = iniciarEtapas({ url: cfg.urlEtapas, urlDocumentos: cfg.urlDocumentos, getPeriodo: () => estado.periodo, esAdmin: cfg.esAdmin, onAbrir: (modulo, id) => actividades.abrir(modulo, id) });
+// Modal «Mi día»: sugerencias para gestionar el día. Al cerrarlo con «Empezar mi día» arranca la rotación del tablero desde Solicitudes.
+const hh = new Date().getHours();
+const planDia = iniciarPlanDia({
+    url: cfg.urlPlanDia, userId: cfg.userId,
+    saludo: `${hh < 12 ? 'Buenos días' : hh < 19 ? 'Buenas tardes' : 'Buenas noches'}, ${cfg.usuario}`,
+    acciones: {
+        pausar: () => etapas.pausar(),
+        empezar: () => etapas.reproducir(),
+        vencidas: () => alertas.revisar(),
+        actividades: (f) => actividades.filtrar(f),
+        etapa: (clave, nivel) => etapas.ver(clave, nivel),
+        abrirDoc: (m, id) => actividades.abrir(m, id),
+        programar: () => actividades.programar(),
+    },
+});
+document.getElementById('d-mi-dia')?.addEventListener('click', () => planDia.abrir());
+// Siempre que se llega al tablero se muestra el plan del día. Mientras se prepara (y se lee) el flujo comercial queda pausado;
+// al cerrar el modal arranca la presentación desde Solicitudes (o de inmediato si no se pudo mostrar).
+etapas.pausar();
+planDia.abrir().then((mostro) => { if (!mostro) etapas.reproducir(); });
+
 const proceso = iniciarProceso({
     url: cfg.urlProceso,
     urlDocumentos: cfg.urlProcesoDocs,
@@ -305,7 +336,7 @@ new MutationObserver(() => {
 // ------------------------------------------------------------------ arranque
 
 const h = new Date().getHours();
-$('d-saludo').textContent = `${h < 12 ? 'Buenos días' : h < 19 ? 'Buenas tardes' : 'Buenas noches'}, ${cfg.usuario}`;
+$('d-hola').textContent = `${h < 12 ? 'Buenos días' : h < 19 ? 'Buenas tardes' : 'Buenas noches'}, ${cfg.usuario}`;
 Chart.defaults.font.family = getComputedStyle(document.body).fontFamily;
 Chart.defaults.font.size = 11.5;
 

@@ -17,6 +17,7 @@ const nivelMora = (d) => (d <= MORA.verde.hasta ? 'verde' : d <= MORA.ambar.hast
 // Color de la etiqueta de estado de la solicitud.
 const COLOR_ESTADO = { 1: '#2563eb', 2: '#0891b2', 3: '#0891b2', 6: '#0891b2', 4: '#7c3aed', 5: '#059669' };
 
+const fechaNum = (iso) => (iso ? `${iso.slice(8, 10)}/${iso.slice(5, 7)}/${iso.slice(0, 4)}` : '');
 const fechaCorta = (iso) => (iso ? new Date(`${iso}T00:00:00`).toLocaleDateString('es-CO', { day: 'numeric', month: 'short' }) : '');
 const iniciales = (n) => String(n ?? '?').split(/\s+/).filter(Boolean).slice(0, 2).map((p) => p[0]).join('').toUpperCase() || '?';
 const sumarDias = (n) => {
@@ -66,34 +67,42 @@ export function iniciarTablero({ raiz, config, csrfToken, ficha, panel, onCambio
     const col = (clave) => cuerpo.querySelector(`[data-col="${clave}"]`);
 
     function tarjeta(s) {
-        const nivel = nivelMora(s.mora);
         const vencido = s.contactoVencido;
         const ultimo = s.ultimoSeguimiento;
-        const colorEstado = COLOR_ESTADO[s.estado] ?? '#64748b';
-        const prox = s.proximoContacto ? (vencido ? `Contactar · ${fechaCorta(s.proximoContacto)}` : fechaCorta(s.proximoContacto)) : 'Sin programar';
-        return `<article class="kb-card sol mora-${nivel}" draggable="true" data-id="${s.id}">
+        const sal = s.salud, urg = s.urgencia;
+        const cUrg = urg?.color ?? '#94a3b8';
+        const desde = s.reabierta ?? s.ingreso;
+        const prox = s.proximoContacto ? (vencido ? `Contactar · ${fechaCorta(s.proximoContacto)}` : fechaCorta(s.proximoContacto)) : '';
+        // Borde izquierdo = urgencia; borde derecho y punto = salud (al día / en riesgo / en mora).
+        return `<article class="kb-card sol" style="--u:${cUrg};--m:${sal.color}" draggable="true" data-id="${s.id}">
             <div class="sol-hdr">
+                <span class="sol-dot" title="${esc(sal.nombre)}"></span>
                 <a href="#" class="sol-id" data-acc="editar" title="Abrir la solicitud">${esc(s.ref)}</a>
-                <span class="sol-badge" title="Días desde la creación">${esc(MORA[nivel].txt)}</span>
+                <button type="button" class="sol-badge ${urg ? '' : 'sin'}" data-acc="urgencia" title="Urgencia: clic para cambiarla" style="--b:${cUrg}">${urg ? esc(urg.valor) : '+ Urgencia'}</button>
                 <button type="button" class="kb-mas" data-acc="menu" title="Más acciones" aria-label="Más acciones"><i class="fa-solid fa-ellipsis-vertical"></i></button>
             </div>
             <div class="sol-cli" title="${esc(s.cliente || '')}">${esc(s.cliente || 'Sin cliente')}</div>
             <div class="sol-desc" title="${esc(s.asunto)}">${esc(s.asunto) || '<em>Sin asunto</em>'}</div>
             <div class="sol-grid">
-                <div class="sol-tag" title="Estado de la solicitud"><div class="lbl">Estado</div><div class="val" style="color:${colorEstado}"><span class="dot" style="background:${colorEstado}"></span>${esc(s.estadoNombre)}</div></div>
-                <div class="sol-tag" title="Próximo contacto"><div class="lbl">Próx. contacto</div><div class="val ${vencido ? 'crit' : ''}"><span class="dot" style="background:${vencido ? 'var(--rojo)' : 'var(--muted-foreground)'}"></span>${prox}</div></div>
+                <div class="sol-tag" data-acc="urgencia" title="Urgencia (clic para cambiarla)"><div class="lbl">Urgencia</div><div class="val" style="color:${cUrg}"><span class="dot" style="background:${cUrg}"></span>${urg ? esc(urg.valor) : 'Sin definir'}</div></div>
+                <div class="sol-tag" title="Salud según los días de mora"><div class="lbl">Estado</div><div class="val" style="color:${sal.color}"><span class="dot" style="background:${sal.color}"></span>${esc(sal.nombre)}</div></div>
             </div>
             <div class="sol-mora">
-                <span class="lbl">MORA TOTAL <small>desde ingreso</small></span>
-                <span class="val">${s.mora} <small>días</small></span>
+                <span class="lbl">MORA TOTAL <small>desde ${s.reabierta ? 'reapertura' : 'ingreso'} ${fechaNum(desde)}</small></span>
+                <span class="val">${s.moraTotal} <small>días</small></span>
             </div>
             <div class="sol-ft">
-                <span class="sol-resp" title="${esc(s.creador || '')}">&#128100; ${esc(s.creador || '—')}</span>
+                <span class="sol-ing" title="Fecha de ingreso">&#128197; Ingreso: ${fechaNum(s.ingreso)}</span>
+                <span class="sol-resp" title="Gestor">&#128100; ${esc(s.gestor || '—')}</span>
+            </div>
+            ${ultimo ? `<div class="sol-seg" title="${esc(ultimo.texto)}">&#128204; <b>${ultimo.fecha ? fechaNum(ultimo.fecha) : ''}</b>${ultimo.autor ? ` · ${esc(ultimo.autor)}` : ''}</div>` : '<div class="sol-seg sin">&#128204; Sin seguimiento</div>'}
+            <div class="sol-acc">
+                <span class="sol-est" title="Estado de la solicitud" style="--e:${COLOR_ESTADO[s.estado] ?? '#64748b'}">${esc(s.estadoNombre)}</span>
+                ${prox ? `<span class="sol-prox ${vencido ? 'vencido' : ''}" title="Próximo contacto"><i class="fa-solid fa-phone"></i> ${prox}</span>` : ''}
                 ${s.productos ? `<span class="sol-mini" title="Productos"><i class="fa-solid fa-box"></i>${s.productos}</span>` : ''}
                 <span class="sol-mini ${s.correoEnviado ? 'ok' : ''}" title="${s.correoEnviado ? 'Correo enviado al cliente' : 'Aún sin correo al cliente'}"><i class="fa-solid ${s.correoEnviado ? 'fa-envelope-circle-check' : 'fa-envelope'}"></i></span>
                 <button type="button" class="kb-seguir" data-acc="seguimiento" title="Registrar seguimiento"><i class="fa-solid fa-comment-medical"></i>Seguimiento</button>
             </div>
-            ${ultimo ? `<div class="sol-seg" title="${esc(ultimo.texto)}">&#128204; ${ultimo.fecha ? `<b>${fechaCorta(ultimo.fecha)}</b> · ` : ''}${esc(ultimo.texto)}</div>` : '<div class="sol-seg sin">&#128204; Sin seguimiento</div>'}
         </article>`;
     }
 
@@ -289,6 +298,23 @@ export function iniciarTablero({ raiz, config, csrfToken, ficha, panel, onCambio
         });
     }
 
+    /** Fija la urgencia (Alta / Media / Baja) desde la tarjeta; se repinta la columna al guardar. */
+    function menuUrgencia(ancla, s, origen) {
+        const f = flotante(ancla, `<small>Urgencia</small>${(config.tablero.urgencias ?? []).map((u) => `<button type="button" data-u="${esc(u.valor)}" style="--c:${u.color}"><i class="fa-solid fa-circle"></i>${esc(u.valor)}${s.urgencia?.valor === u.valor ? ' <i class="fa-solid fa-check"></i>' : ''}</button>`).join('')}`);
+        f.addEventListener('click', async (ev) => {
+            const b = ev.target.closest('[data-u]');
+            if (!b) return;
+            cerrarFlotantes();
+            if (s.urgencia?.valor === b.dataset.u) return;
+            try {
+                const r = await pedir(config.tablero.urgenciaUrl.replace('__ID__', s.id), 'PUT', { valor: b.dataset.u });
+                s.urgencia = r.urgencia;
+                pintar(origen);
+                toast.fire({ icon: 'success', title: r.message });
+            } catch (err) { toast.fire({ icon: 'error', title: err.message }); }
+        });
+    }
+
     /** Seguimiento completo (bitácora, próximo contacto y correo con IA) en un diálogo. */
     function seguimientoRapido(ancla, s, origen) {
         cerrarFlotantes();
@@ -308,11 +334,12 @@ export function iniciarTablero({ raiz, config, csrfToken, ficha, panel, onCambio
         const hallada = buscar(id);
         if (!hallada) return;
         const acc = a?.dataset.acc ?? 'editar'; // un clic en cualquier parte de la tarjeta abre la solicitud
-        if (acc === 'menu') menu(a, hallada.s, hallada.origen);
+        if (acc === 'urgencia') menuUrgencia(a, hallada.s, hallada.origen);
+        else if (acc === 'menu') menu(a, hallada.s, hallada.origen);
         else if (acc === 'seguimiento') seguimientoRapido(a, hallada.s, hallada.origen);
         else ficha.abrir(id);
     });
-    document.addEventListener('click', (ev) => { if (!ev.target.closest('.kb-flotante, [data-acc=menu], [data-acc=seguimiento]')) cerrarFlotantes(); });
+    document.addEventListener('click', (ev) => { if (!ev.target.closest('.kb-flotante, [data-acc=menu], [data-acc=seguimiento], [data-acc=urgencia]')) cerrarFlotantes(); });
     document.addEventListener('keydown', (ev) => { if (ev.key === 'Escape') cerrarFlotantes(); });
     cuerpo.addEventListener('scroll', cerrarFlotantes, true);
 

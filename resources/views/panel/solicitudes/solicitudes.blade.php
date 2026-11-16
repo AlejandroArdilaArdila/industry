@@ -104,6 +104,8 @@
                 columnaUrl: @json(route('panel.solicitudes.tablero.columna', '__COL__')),
                 motivosUrl: @json(route('panel.solicitudes.tablero.motivos')),
                 moverUrl: @json(route('panel.solicitudes.mover', '__ID__')),
+                urgencias: @json($tablero['urgencias']),
+                urgenciaUrl: @json(route('panel.solicitudes.urgencia', '__ID__')),
                 seguimientoUrl: @json(route('panel.actividades.store')),
                 seguimientoUrls: {
                     ctx: @json(route('panel.solicitudes.seguimiento.contexto', '__ID__')),

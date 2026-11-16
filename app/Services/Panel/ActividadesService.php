@@ -686,4 +686,25 @@ class ActividadesService
             }
         });
     }
+
+    /** Mueve un recordatorio pendiente a otra fecha/hora. @return string nueva fecha-hora (Y-m-d H:i:s) */
+    public function posponer(object $usuario, int $eventoId, string $fecha, ?string $hora): string
+    {
+        $uid = (int) $usuario->getKey();
+        $ev = DB::selectOne("SELECT id, fk_element, elementtype, datep, fk_user_author, fk_user_action FROM {$this->p}actioncomm WHERE id = ? AND code LIKE ?", [$eventoId, self::AC_LIKE]);
+        if (! $ev || ! ($usuario->isAdmin() || (int) $ev->fk_user_author === $uid || (int) $ev->fk_user_action === $uid)) {
+            throw new InvalidArgumentException('Recordatorio no encontrado.');
+        }
+        $datep = Carbon::createFromFormat('Y-m-d H:i', $fecha.' '.($hora ?: substr((string) $ev->datep, 11, 5)), self::TZ)->format('Y-m-d H:i:s');
+        DB::transaction(function () use ($eventoId, $ev, $datep, $uid) {
+            DB::table('actioncomm')->where('id', $eventoId)->update(['datep' => $datep, 'datep2' => $datep, 'fk_user_mod' => $uid]);
+            foreach (self::MODULOS as $cfg) {
+                if ($cfg['elemento'] === $ev->elementtype && $cfg['proximo']) {
+                    DB::table($cfg['obj'])->where('rowid', $ev->fk_element)->update(['fecha_proximo_contacto' => $datep]);
+                }
+            }
+        });
+
+        return $datep;
+    }
 }
